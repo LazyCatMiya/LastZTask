@@ -1,0 +1,11 @@
+[
+  {
+    "name": "example",
+    "uid": "1234567890000136"
+  },
+  {
+    "name": "disabled-example",
+    "uid": "1234567890000137",
+    "enabled": false
+  }
+]
