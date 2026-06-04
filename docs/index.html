@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LastZ Task Runner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;800&family=Nunito:wght@500;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cream: "#FAF5EF",
+            ink: "#26312f",
+            muted: "#7b847f",
+            line: "#e6ddd2",
+            brand: "#277A6A",
+            brandSoft: "#e6f0ec",
+            danger: "#b95043",
+            panelSoft: "#fbf8f4",
+          },
+          fontFamily: {
+            sans: ["Nunito", "Noto Sans TC", "ui-sans-serif", "system-ui", "sans-serif"],
+          },
+          keyframes: {
+            catWiggle: {
+              "0%, 100%": { transform: "rotate(-4deg)" },
+              "50%": { transform: "rotate(3deg)" },
+            },
+            catFloat: {
+              "0%, 100%": { transform: "translateY(0)" },
+              "50%": { transform: "translateY(-4px)" },
+            },
+            resultIn: {
+              "0%": { opacity: "0", transform: "translateY(8px)" },
+              "100%": { opacity: "1", transform: "translateY(0)" },
+            },
+          },
+          animation: {
+            catWiggle: "catWiggle 5.5s ease-in-out infinite",
+            catFloat: "catFloat 3.2s ease-in-out infinite",
+            resultIn: "resultIn 180ms ease-out both",
+          },
+          boxShadow: {
+            soft: "0 12px 28px rgba(67, 54, 43, 0.08)",
+          },
+        },
+      },
+    };
+  </script>
+  <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script type="module">
+    import * as FramerMotion from "https://esm.sh/framer-motion@11.18.2?bundle";
+    window.FramerMotion = FramerMotion;
+  </script>
+</head>
+<body class="min-h-screen bg-cream text-ink antialiased">
+  <div id="root"></div>
+
+  <script>
+    const { useEffect, useMemo, useState } = React;
+    const { createRoot } = ReactDOM;
+    const h = React.createElement;
+    const STORE_ORIGIN = "https://store.last-z.com";
+    const GIFT_ORIGIN = "https://giftcenter.last-z.com";
+    const USER_STORAGE_KEY = "lastz:user-id";
+    const LANGUAGE_STORAGE_KEY = "lastz:language";
+
+    const translations = {
+      zh: {
+        subtitle: "官網任務與禮物碼領取",
+        controls: "操作",
+        userId: "User ID",
+        giftCode: "禮物碼",
+        runTasks: "完成官網任務",
+        redeemGift: "領取禮物碼",
+        results: "結果",
+        noResults: "尚無結果",
+        ready: "就緒",
+        missingInput: "缺少輸入",
+        missingUserId: "缺少 user id",
+        runningTasks: "執行任務中",
+        redeeming: "領取中",
+        redeemed: "已領取",
+        failed: "失敗",
+        waiting: "等待中",
+        done: "{ok}/{total} 完成",
+        itemCount: "{count} 筆",
+        taskDay7: "七日簽到",
+        taskGetShop: "進入積分商城頁面",
+        taskLogin: "完成任務：登入",
+        taskViewUcenter: "完成任務：瀏覽會員中心頁面",
+        taskViewShop: "完成任務：瀏覽積分商城頁面",
+        taskFirst2000: "首次購買金磚數量達到 2000",
+        taskVipWeek: "領取每週特權禮包",
+        taskRedeemGift: "領取禮物碼",
+        catNudge: "今天也要優雅完成任務",
+      },
+      en: {
+        subtitle: "Website tasks and gift code redemption",
+        controls: "Controls",
+        userId: "User ID",
+        giftCode: "Gift Code",
+        runTasks: "Complete Website Tasks",
+        redeemGift: "Redeem Gift Code",
+        results: "Results",
+        noResults: "No results yet",
+        ready: "Ready",
+        missingInput: "Missing input",
+        missingUserId: "Missing user id",
+        runningTasks: "Running tasks",
+        redeeming: "Redeeming",
+        redeemed: "Redeemed",
+        failed: "Failed",
+        waiting: "Waiting",
+        done: "{ok}/{total} done",
+        itemCount: "{count} items",
+        taskDay7: "7-day check-in",
+        taskGetShop: "Open points shop page",
+        taskLogin: "Complete task: login",
+        taskViewUcenter: "Complete task: view member center",
+        taskViewShop: "Complete task: view points shop",
+        taskFirst2000: "First 2000 gold brick purchase",
+        taskVipWeek: "Claim weekly VIP package",
+        taskRedeemGift: "Redeem gift code",
+        catNudge: "A tidy little task run, with paws",
+      },
+    };
+
+    const taskDefinitions = [
+      {
+        nameKey: "taskDay7",
+        method: "POST",
+        url: `${STORE_ORIGIN}/sendday7_new.php`,
+        body: uid => ({ uid, fromkoc: "", day: 1, dtype: 0, lang: "zh-HK" }),
+      },
+      {
+        nameKey: "taskGetShop",
+        method: "POST",
+        url: `${STORE_ORIGIN}/getshop.php`,
+        body: uid => ({ uid, fromOrigin: "website" }),
+      },
+      {
+        nameKey: "taskLogin",
+        method: "POST",
+        url: `${STORE_ORIGIN}/sendtask_new.php`,
+        body: uid => ({ uid, type: "login", lang: "hk", fromOrigin: "website" }),
+      },
+      {
+        nameKey: "taskViewUcenter",
+        method: "POST",
+        url: `${STORE_ORIGIN}/sendtask_new.php`,
+        body: uid => ({ uid, type: "viewucenter", lang: "hk", fromOrigin: "website" }),
+      },
+      {
+        nameKey: "taskViewShop",
+        method: "POST",
+        url: `${STORE_ORIGIN}/sendtask_new.php`,
+        body: uid => ({ uid, type: "viewshop", lang: "hk", fromOrigin: "website" }),
+      },
+      {
+        nameKey: "taskFirst2000",
+        method: "POST",
+        url: `${STORE_ORIGIN}/sendtask_new.php`,
+        body: uid => ({ uid, type: "first2000", fromkoc: "", lang: "zh-HK" }),
+      },
+      {
+        nameKey: "taskVipWeek",
+        method: "POST",
+        url: `${STORE_ORIGIN}/sendvip.php`,
+        body: uid => ({ uid, vlevel: 1, type: "week", lang: "hk" }),
+      },
+    ];
+
+    function getInitialLanguage() {
+      const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      if (saved === "zh" || saved === "en") return saved;
+      return navigator.language && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+    }
+
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function readResponse(response) {
+      const text = await response.text();
+      let body = text;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
+      return { status: response.status, body };
+    }
+
+    async function postJson(uid, url, body) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          "Content-Type": "application/json",
+          Usertoken: uid,
+        },
+        body: JSON.stringify(body),
+      });
+      return readResponse(response);
+    }
+
+    async function getJson(uid, url) {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          Usertoken: uid,
+        },
+      });
+      return readResponse(response);
+    }
+
+    function isSuccessBody(body) {
+      if (!body || typeof body !== "object") return false;
+      if (Object.prototype.hasOwnProperty.call(body, "code")) return body.code === 0;
+      if (Object.prototype.hasOwnProperty.call(body, "shopConfig")) return true;
+      return false;
+    }
+
+    function formatResponse(result) {
+      const body = typeof result.body === "string" ? result.body : JSON.stringify(result.body);
+      return `HTTP ${result.status} ${body}`;
+    }
+
+    function Icon({ icon, className = "h-[18px] w-[18px]" }) {
+      return h("span", {
+        className: `${className} inline-flex flex-none items-center justify-center leading-none`,
+        "aria-hidden": true,
+      }, h("iconify-icon", { icon, width: "100%", height: "100%" }));
+    }
+
+    function celebrate() {
+      if (!window.confetti) return;
+      window.confetti({
+        particleCount: 56,
+        spread: 58,
+        origin: { y: 0.18 },
+        colors: ["#277A6A", "#FAF5EF", "#F1C9A5", "#E6F0EC"],
+        scalar: 0.82,
+      });
+    }
+
+    function App() {
+      const [language, setLanguageState] = useState(getInitialLanguage);
+      const [uid, setUid] = useState(() => localStorage.getItem(USER_STORAGE_KEY) || "");
+      const [giftCode, setGiftCode] = useState("");
+      const [results, setResults] = useState([]);
+      const [busy, setBusy] = useState(false);
+      const [status, setStatus] = useState({ state: "idle", key: "ready", params: {} });
+
+      const t = useMemo(() => {
+        return (key, params = {}) => {
+          const template = translations[language][key] || translations.en[key] || key;
+          return template.replace(/\{(\w+)\}/g, (_, name) => params[name] ?? "");
+        };
+      }, [language]);
+
+      useEffect(() => {
+        document.documentElement.lang = language === "zh" ? "zh-Hant" : "en";
+        localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+      }, [language]);
+
+      function setLanguage(nextLanguage) {
+        setLanguageState(nextLanguage);
+      }
+
+      function updateUid(nextUid) {
+        setUid(nextUid);
+        localStorage.setItem(USER_STORAGE_KEY, nextUid.trim());
+      }
+
+      function requireUid() {
+        const cleanUid = uid.trim();
+        if (!cleanUid) {
+          setStatus({ state: "bad", key: "missingUserId", params: {} });
+          return "";
+        }
+        localStorage.setItem(USER_STORAGE_KEY, cleanUid);
+        return cleanUid;
+      }
+
+      async function runWebsiteTasks() {
+        const cleanUid = requireUid();
+        if (!cleanUid) return;
+
+        setBusy(true);
+        setResults([]);
+        setStatus({ state: "running", key: "runningTasks", params: {} });
+
+        let okCount = 0;
+        for (const task of taskDefinitions) {
+          const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${task.nameKey}`;
+          const pendingResult = {
+            id,
+            nameKey: task.nameKey,
+            method: task.method,
+            state: "running",
+            detail: t("waiting"),
+          };
+          setResults(previous => [...previous, pendingResult]);
+
+          try {
+            const response = await postJson(cleanUid, task.url, task.body(cleanUid));
+            const ok = isSuccessBody(response.body);
+            if (ok) {
+              okCount += 1;
+              celebrate();
+            }
+            setResults(previous => previous.map(result => (
+              result.id === id
+                ? { ...result, state: ok ? "ok" : "bad", detail: formatResponse(response) }
+                : result
+            )));
+          } catch (error) {
+            setResults(previous => previous.map(result => (
+              result.id === id
+                ? { ...result, state: "bad", detail: error.message }
+                : result
+            )));
+          }
+
+          await wait(450);
+        }
+
+        setStatus({
+          state: okCount === taskDefinitions.length ? "ok" : "bad",
+          key: "done",
+          params: { ok: okCount, total: taskDefinitions.length },
+        });
+        setBusy(false);
+      }
+
+      async function redeemGiftCode() {
+        const cleanUid = requireUid();
+        const cleanCode = giftCode.trim();
+        if (!cleanUid || !cleanCode) {
+          setStatus({ state: "bad", key: "missingInput", params: {} });
+          return;
+        }
+
+        setBusy(true);
+        setResults([]);
+        setStatus({ state: "running", key: "redeeming", params: {} });
+
+        const url = new URL(`${GIFT_ORIGIN}/code.php`);
+        url.searchParams.set("uid", cleanUid);
+        url.searchParams.set("code", cleanCode);
+
+        const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-gift`;
+        setResults([{
+          id,
+          nameKey: "taskRedeemGift",
+          method: "GET",
+          state: "running",
+          detail: t("waiting"),
+        }]);
+
+        try {
+          const response = await getJson(cleanUid, url.toString());
+          const ok = response.body && response.body.errorCode === "ok";
+          if (ok) celebrate();
+          setResults(previous => previous.map(result => (
+            result.id === id
+              ? { ...result, state: ok ? "ok" : "bad", detail: formatResponse(response) }
+              : result
+          )));
+          setStatus({ state: ok ? "ok" : "bad", key: ok ? "redeemed" : "failed", params: {} });
+        } catch (error) {
+          setResults(previous => previous.map(result => (
+            result.id === id ? { ...result, state: "bad", detail: error.message } : result
+          )));
+          setStatus({ state: "bad", key: "failed", params: {} });
+        }
+
+        setBusy(false);
+      }
+
+      return h("main", { className: "mx-auto w-[min(1120px,calc(100vw-32px))] py-7 text-ink md:py-9" },
+        h("header", { className: "flex min-h-[52px] flex-col gap-4 border-b border-line pb-4 md:flex-row md:items-center md:justify-between" },
+          h("div", { className: "flex min-w-0 items-center gap-3" },
+            h("div", { className: "grid h-[46px] w-[46px] animate-catWiggle place-items-center rounded-lg bg-brand text-white shadow-soft" },
+              h(Icon, { icon: "fa6-solid:cat", className: "h-7 w-7" }),
+            ),
+            h("div", null,
+              h("h1", { className: "m-0 flex items-center gap-2 text-[clamp(20px,3vw,28px)] font-black leading-none tracking-normal" },
+                "LastZ Task Runner",
+                h(Icon, { icon: "mdi:paw", className: "h-5 w-5 text-brand" }),
+              ),
+              h("p", { className: "mt-1 text-sm text-muted" }, t("subtitle")),
+            ),
+          ),
+          h("div", { className: "flex flex-wrap items-center justify-between gap-2 md:justify-end" },
+            h("div", { className: "grid min-h-[34px] grid-cols-2 overflow-hidden rounded-full border border-line bg-white/60", "aria-label": "Language" },
+              ["zh", "en"].map(option => h("button", {
+                key: option,
+                type: "button",
+                className: `min-w-[52px] px-3 text-sm font-extrabold ${language === option ? "bg-brand text-white" : "text-muted"}`,
+                "aria-pressed": String(language === option),
+                onClick: () => setLanguage(option),
+              }, option === "zh" ? "中文" : "EN")),
+            ),
+            h("div", { className: "inline-flex min-h-[34px] items-center gap-2 rounded-full border border-line bg-white/60 px-3 text-muted" },
+              h("span", { className: `h-2 w-2 rounded-full ${status.state === "bad" ? "bg-danger" : status.state === "idle" ? "bg-muted" : "bg-brand"}` }),
+              h("span", null, t(status.key, status.params)),
+            ),
+          ),
+        ),
+        h("section", { className: "mt-6 grid items-start gap-[18px] md:grid-cols-[minmax(280px,380px)_minmax(0,1fr)]", "aria-label": "LastZ controls" },
+          h(Panel, { title: t("controls") },
+            h("div", { className: "grid gap-4 p-[18px]" },
+              h(Field, { label: t("userId"), htmlFor: "uidInput" },
+                h("input", {
+                  id: "uidInput",
+                  name: "uid",
+                  inputMode: "numeric",
+                  autoComplete: "off",
+                  placeholder: "1556975198000136",
+                  value: uid,
+                  onChange: event => updateUid(event.target.value),
+                  className: inputClassName,
+                }),
+              ),
+              h(Field, { label: t("giftCode"), htmlFor: "giftCodeInput" },
+                h("input", {
+                  id: "giftCodeInput",
+                  name: "giftCode",
+                  autoComplete: "off",
+                  placeholder: "CELEBRATE300K",
+                  value: giftCode,
+                  onChange: event => setGiftCode(event.target.value),
+                  className: inputClassName,
+                }),
+              ),
+              h("div", { className: "grid gap-2.5" },
+                h("button", {
+                  type: "button",
+                  disabled: busy,
+                  onClick: runWebsiteTasks,
+                  className: primaryButtonClassName,
+                }, h(Icon, { icon: "mdi:paw" }), h("span", null, t("runTasks"))),
+                h("button", {
+                  type: "button",
+                  disabled: busy,
+                  onClick: redeemGiftCode,
+                  className: secondaryButtonClassName,
+                }, h(Icon, { icon: "solar:gift-bold" }), h("span", null, t("redeemGift"))),
+                h("p", { className: "flex items-center justify-center gap-1.5 text-center text-xs font-bold text-muted" },
+                  h(Icon, { icon: "fa6-solid:cat", className: "h-4 w-4 text-brand" }),
+                  t("catNudge"),
+                ),
+              ),
+            ),
+          ),
+          h(Panel, { title: t("results"), meta: t("itemCount", { count: results.length }) },
+            h("div", { className: "grid max-h-[calc(100vh-180px)] gap-2 overflow-auto p-[18px] md:min-h-[360px]" },
+              results.length === 0
+                ? h(EmptyState, { label: t("noResults") })
+                : results.map(result => h(ResultItem, {
+                    key: result.id,
+                    result,
+                    name: t(result.nameKey),
+                  })),
+            ),
+          ),
+        ),
+      );
+    }
+
+    const inputClassName = "min-h-11 w-full rounded-md border border-line bg-white px-3 text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/15";
+    const primaryButtonClassName = "inline-flex min-h-[46px] items-center justify-center gap-2 rounded-md bg-brand px-4 font-extrabold text-white transition hover:-translate-y-0.5 hover:bg-brand/95 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0";
+    const secondaryButtonClassName = "inline-flex min-h-[46px] items-center justify-center gap-2 rounded-md border border-brand/35 bg-brandSoft px-4 font-extrabold text-brand transition hover:-translate-y-0.5 hover:bg-brandSoft/75 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0";
+
+    function Panel({ title, meta, children }) {
+      return h("div", { className: "overflow-hidden rounded-lg border border-line bg-white/70 shadow-soft" },
+        h("div", { className: "flex items-center justify-between gap-3 border-b border-line bg-panelSoft px-[18px] py-4" },
+          h("h2", { className: "m-0 text-base font-extrabold leading-tight tracking-normal" }, title),
+          meta ? h("span", { className: "text-xs font-extrabold text-muted" }, meta) : null,
+        ),
+        children,
+      );
+    }
+
+    function Field({ label, htmlFor, children }) {
+      return h("div", { className: "grid gap-2" },
+        h("label", { htmlFor, className: "text-[13px] font-bold text-muted" }, label),
+        children,
+      );
+    }
+
+    function EmptyState({ label }) {
+      return h("div", { className: "grid min-h-80 place-items-center p-8 text-center text-muted" },
+        h("div", null,
+          h("div", { className: "mx-auto mb-4 grid h-[76px] w-[76px] animate-catFloat place-items-center rounded-lg border border-line bg-brandSoft text-brand" },
+            h(Icon, { icon: "fa6-solid:cat", className: "h-11 w-11" }),
+          ),
+          h("div", null, label),
+        ),
+      );
+    }
+
+    function ResultItem({ result, name }) {
+      return h("article", { className: "grid animate-resultIn grid-cols-[28px_minmax(0,1fr)_auto] items-start gap-2.5 rounded-lg border border-line bg-white p-3" },
+        h("div", { className: `grid h-[26px] w-[26px] place-items-center rounded-full text-sm font-extrabold text-white ${badgeClass(result.state)}` }, stateIcon(result.state)),
+        h("div", null,
+          h("p", { className: "m-0 text-sm font-extrabold leading-tight" }, name),
+          h("p", { className: "mt-1 break-words font-mono text-xs leading-relaxed text-muted" }, result.detail),
+        ),
+        h("span", { className: "text-xs font-extrabold text-muted" }, result.method),
+      );
+    }
+
+    function badgeClass(state) {
+      if (state === "ok") return "bg-brand";
+      if (state === "bad") return "bg-danger";
+      return "bg-brand";
+    }
+
+    function stateIcon(state) {
+      if (state === "ok") return "✓";
+      if (state === "bad") return "!";
+      return "…";
+    }
+
+    createRoot(document.getElementById("root")).render(h(App));
+  </script>
+</body>
+</html>

@@ -18,6 +18,12 @@ This project runs captured LastZ store task APIs for one or more player IDs:
 
 Use this only with accounts you are allowed to operate.
 
+### GitHub Pages
+
+The static web page is in `docs/index.html`. In GitHub Pages, publish from the `docs` folder on your default branch.
+
+The page uses React CDN, Tailwind CSS CDN, Framer Motion CDN, Iconify CDN, Google Fonts, and canvas-confetti CDN. It stores the entered user ID in browser `localStorage`, runs website tasks for that ID, and can redeem one gift code for the same ID.
+
 ### Batch Accounts
 
 Account lists are loaded from `accounts.json`. Create one from the example file:
@@ -205,6 +211,12 @@ GKE is useful when you want the job to run independently from a local machine.
 - 領取「每週特權禮包」：`sendvip.php`
 
 請只對你有權操作的帳號使用。
+
+### GitHub Pages
+
+靜態網頁放在 `docs/index.html`。在 GitHub Pages 設定中，選擇從預設分支的 `docs` 資料夾發佈。
+
+頁面使用 React CDN、Tailwind CSS CDN、Framer Motion CDN、Iconify CDN、Google Fonts、canvas-confetti CDN。它會把輸入的 user id 存到瀏覽器 `localStorage`，可以用同一個 user id 完成官網任務，也可以領取一組禮物碼。
 
 ### 跑固定名單
 
