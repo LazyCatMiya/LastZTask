@@ -83,6 +83,18 @@ def build_tasks(uid: str, day: int, vip_level: int) -> list[ApiTask]:
             },
         ),
         ApiTask(
+            name="完成任務：瀏覽會員中心頁面",
+            url=f"{STORE_ORIGIN}/sendtask_new.php",
+            origin=WEBSITE_ORIGIN,
+            referer=f"{WEBSITE_ORIGIN}/",
+            payload={
+                "uid": uid,
+                "type": "viewucenter",
+                "lang": "hk",
+                "fromOrigin": "website",
+            },
+        ),
+        ApiTask(
             name="完成任務：瀏覽積分商城頁面",
             url=f"{STORE_ORIGIN}/sendtask_new.php",
             origin=WEBSITE_ORIGIN,
