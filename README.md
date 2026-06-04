@@ -1,18 +1,10 @@
 # LastZ Task API Script
 
 <p>
-  <a href="#english-documentation"><strong>English Documentation</strong></a>
-  &nbsp;|&nbsp;
   <a href="#zh-docs"><strong>中文文檔</strong></a>
 </p>
 
-<p>
-  <a href="#zh-docs">
-    <img alt="中文文檔" src="https://img.shields.io/badge/中文文檔-點擊查看-blue?style=for-the-badge">
-  </a>
-</p>
-
-## English Documentation
+## Documentation
 
 This project runs captured LastZ store task APIs for one or more player IDs:
 
