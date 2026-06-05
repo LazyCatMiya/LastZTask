@@ -156,10 +156,10 @@ python3 buy_orange_gear.py --all-accounts --insecure
 
 ### GKE CronJob
 
-The project includes `Dockerfile` and `k8s/cronjob.yaml`. The CronJob runs daily at 10:30 Taipei time:
+The project includes `Dockerfile` and `k8s/cronjob.yaml`. The CronJob runs daily at 09:30 and 10:30 Taipei time:
 
 ```yaml
-schedule: "30 10 * * *"
+schedule: "30 9,10 * * *"
 timeZone: "Asia/Taipei"
 ```
 
@@ -210,7 +210,7 @@ kubectl logs job/last-daily-tasks-manual
 
 The CronJob uses `--quiet` by default, so `kubectl logs` is expected to be empty during normal runs. Check Job or Pod status to confirm completion.
 
-If your GKE version does not support `timeZone`, remove `timeZone: "Asia/Taipei"` and change the schedule to UTC: `30 2 * * *`.
+If your GKE version does not support `timeZone`, remove `timeZone: "Asia/Taipei"` and change the schedule to UTC: `30 1,2 * * *`.
 
 ### Local Scheduling
 
@@ -376,10 +376,10 @@ python3 buy_orange_gear.py --all-accounts --insecure
 
 ### GKE 定時執行
 
-專案已附上 `Dockerfile` 和 `k8s/cronjob.yaml`。CronJob 預設每天台北時間 10:30 執行：
+專案已附上 `Dockerfile` 和 `k8s/cronjob.yaml`。CronJob 預設每天台北時間 09:30 和 10:30 執行：
 
 ```yaml
-schedule: "30 10 * * *"
+schedule: "30 9,10 * * *"
 timeZone: "Asia/Taipei"
 ```
 
@@ -430,7 +430,7 @@ kubectl logs job/last-daily-tasks-manual
 
 CronJob 預設帶 `--quiet`，所以正常情況下 `kubectl logs` 不會有輸出；請用 Job/Pod 狀態確認是否完成。
 
-如果你的 GKE 版本不支援 `timeZone`，請移除 `timeZone: "Asia/Taipei"`，並把 schedule 改成 UTC 的 `30 2 * * *`。
+如果你的 GKE 版本不支援 `timeZone`，請移除 `timeZone: "Asia/Taipei"`，並把 schedule 改成 UTC 的 `30 1,2 * * *`。
 
 ### 本地定時執行
 

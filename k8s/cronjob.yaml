@@ -3,7 +3,7 @@ kind: CronJob
 metadata:
   name: last-daily-tasks
 spec:
-  schedule: "30 10 * * *"
+  schedule: "30 9,10 * * *"
   timeZone: "Asia/Taipei"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
