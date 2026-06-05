@@ -64,7 +64,7 @@
   <div id="root"></div>
 
   <script>
-    const { useEffect, useMemo, useState } = React;
+    const { useEffect, useMemo, useRef, useState } = React;
     const { createRoot } = ReactDOM;
     const h = React.createElement;
     const STORE_ORIGIN = "https://store.last-z.com";
@@ -263,6 +263,13 @@
     }
 
     function formatResponse(result) {
+      if (result.body && typeof result.body === "object" && Array.isArray(result.body.shopConfig)) {
+        const parts = [`shopConfig: ${result.body.shopConfig.length} items`];
+        if (result.body.lid !== undefined) parts.push(`lid: ${result.body.lid}`);
+        if (result.body.score !== undefined) parts.push(`score: ${result.body.score}`);
+        return `HTTP ${result.status} ${parts.join(", ")}`;
+      }
+
       const body = typeof result.body === "string" ? result.body : JSON.stringify(result.body);
       return `HTTP ${result.status} ${body}`;
     }
@@ -292,6 +299,10 @@
       const [results, setResults] = useState([]);
       const [busy, setBusy] = useState(false);
       const [status, setStatus] = useState({ state: "idle", key: "ready", params: {} });
+      const resultsPanelRef = useRef(null);
+      const resultsListRef = useRef(null);
+      const resultsEndRef = useRef(null);
+      const previousResultCountRef = useRef(0);
 
       const t = useMemo(() => {
         return (key, params = {}) => {
@@ -304,6 +315,28 @@
         document.documentElement.lang = language === "zh" ? "zh-Hant" : "en";
         localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
       }, [language]);
+
+      useEffect(() => {
+        if (!busy || results.length <= previousResultCountRef.current) {
+          previousResultCountRef.current = results.length;
+          return;
+        }
+
+        requestAnimationFrame(() => {
+          const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+          if (isDesktop && resultsListRef.current) {
+            resultsListRef.current.scrollTo({
+              top: resultsListRef.current.scrollHeight,
+              behavior: "smooth",
+            });
+            return;
+          }
+
+          resultsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        });
+
+        previousResultCountRef.current = results.length;
+      }, [busy, results.length]);
 
       function setLanguage(nextLanguage) {
         setLanguageState(nextLanguage);
@@ -324,13 +357,21 @@
         return cleanUid;
       }
 
+      function revealResults() {
+        requestAnimationFrame(() => {
+          resultsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+
       async function runWebsiteTasks() {
         const cleanUid = requireUid();
         if (!cleanUid) return;
 
         setBusy(true);
         setResults([]);
+        previousResultCountRef.current = 0;
         setStatus({ state: "running", key: "runningTasks", params: {} });
+        revealResults();
 
         let okCount = 0;
         for (const task of taskDefinitions) {
@@ -385,7 +426,9 @@
 
         setBusy(true);
         setResults([]);
+        previousResultCountRef.current = 0;
         setStatus({ state: "running", key: "redeeming", params: {} });
+        revealResults();
 
         const url = new URL(`${GIFT_ORIGIN}/code.php`);
         url.searchParams.set("uid", cleanUid);
@@ -426,7 +469,9 @@
 
         setBusy(true);
         setResults([]);
+        previousResultCountRef.current = 0;
         setStatus({ state: "running", key: "buyingOrangeGear", params: {} });
+        revealResults();
 
         const task = manualActions.buyOrangeGear;
         const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${task.nameKey}`;
@@ -540,15 +585,21 @@
               ),
             ),
           ),
-          h(Panel, { title: t("results"), meta: t("itemCount", { count: results.length }) },
-            h("div", { className: "grid max-h-[calc(100vh-180px)] gap-2 overflow-auto p-[18px] md:min-h-[360px]" },
-              results.length === 0
-                ? h(EmptyState, { label: t("noResults") })
-                : results.map(result => h(ResultItem, {
-                    key: result.id,
-                    result,
-                    name: t(result.nameKey),
-                  })),
+          h("div", { ref: resultsPanelRef },
+            h(Panel, { title: t("results"), meta: t("itemCount", { count: results.length }) },
+              h("div", {
+                ref: resultsListRef,
+                className: "grid auto-rows-max content-start gap-2 p-[18px] md:max-h-[calc(100vh-180px)] md:min-h-[360px] md:overflow-auto",
+              },
+                results.length === 0
+                  ? h(EmptyState, { label: t("noResults") })
+                  : results.map(result => h(ResultItem, {
+                      key: result.id,
+                      result,
+                      name: t(result.nameKey),
+                    })),
+                h("div", { ref: resultsEndRef, "aria-hidden": true }),
+              ),
             ),
           ),
         ),
