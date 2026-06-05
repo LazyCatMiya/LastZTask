@@ -58,6 +58,16 @@ def build_day7_status_task(uid: str) -> ApiTask:
     )
 
 
+def build_vip_status_task(uid: str) -> ApiTask:
+    return ApiTask(
+        name="取得 VIP 等級資料",
+        url=f"{STORE_ORIGIN}/getvip.php",
+        origin=WEBSITE_ORIGIN,
+        referer=f"{WEBSITE_ORIGIN}/",
+        payload={"uid": uid},
+    )
+
+
 def build_day7_done_task(uid: str) -> ApiTask:
     return ApiTask(
         name="七日簽到：今天簽過了",
@@ -104,16 +114,33 @@ def choose_day7_tasks_from_status(uid: str, text: str) -> list[ApiTask]:
     if not isinstance(rewards, list):
         return []
 
-    tasks: list[ApiTask] = []
+    normal_tasks: list[ApiTask] = []
+    for reward in rewards:
+        if isinstance(reward, dict) and reward.get("status") == 1:
+            normal_tasks.append(build_day7_task(uid, int(reward["day"]), dtype=0))
+
+    makeup_tasks: list[ApiTask] = []
     for reward in rewards:
         if isinstance(reward, dict) and reward.get("status") == -1:
-            tasks.append(build_day7_task(uid, int(reward["day"]), dtype=0))
+            makeup_tasks.append(build_day7_task(uid, int(reward["day"]), dtype=1))
 
-    for reward in rewards:
-        if isinstance(reward, dict) and reward.get("status") == 3:
-            tasks.append(build_day7_task(uid, int(reward["day"]), dtype=1))
-
+    tasks: list[ApiTask] = []
+    if normal_tasks:
+        tasks.extend(normal_tasks)
+    else:
+        tasks.append(build_day7_done_task(uid))
+    tasks.extend(makeup_tasks)
     return tasks
+
+
+def choose_vip_level_from_status(text: str) -> int | None:
+    data = json.loads(text)
+    level = data.get("vlevel")
+    if isinstance(level, int):
+        return level
+    if isinstance(level, str) and level.lstrip("-").isdigit():
+        return int(level)
+    return None
 
 
 def build_tasks(uid: str, day7_tasks: list[ApiTask], vip_level: int) -> list[ApiTask]:
@@ -265,8 +292,8 @@ def parse_args() -> argparse.Namespace:
         description="Input a LastZ user id and call the captured store task APIs."
     )
     parser.add_argument("uid", nargs="?", help="玩家 user id / uid")
-    parser.add_argument("--day", type=int, help="指定七日簽到 day 值；不指定時會先查 getday7 狀態，依序執行 status -1 和 status 3")
-    parser.add_argument("--vip-level", type=int, default=1, help="VIP 等級 vlevel，預設 1")
+    parser.add_argument("--day", type=int, help="指定七日簽到 day 值；不指定時會先查 getday7 狀態，status 1 做今日簽到，status -1 嘗試補簽")
+    parser.add_argument("--vip-level", type=int, default=1, help="getvip.php 查詢失敗或格式不正確時使用的 fallback vlevel，預設 1")
     parser.add_argument("--delay", type=float, default=0.8, help="每個 API 間隔秒數，預設 0.8")
     parser.add_argument("--timeout", type=float, default=20, help="單次請求逾時秒數，預設 20")
     parser.add_argument("--user-agent", default=DEFAULT_USER_AGENT, help="自訂 User-Agent")
@@ -302,6 +329,15 @@ def run_tasks_for_uid(
     day7_tasks = resolve_day7_tasks(
         uid,
         day=day,
+        user_agent=user_agent,
+        timeout=timeout,
+        ssl_context=ssl_context,
+        dry_run=dry_run,
+        quiet=quiet,
+    )
+    vip_level = resolve_vip_level(
+        uid,
+        fallback_vip_level=vip_level,
         user_agent=user_agent,
         timeout=timeout,
         ssl_context=ssl_context,
@@ -394,6 +430,39 @@ def resolve_day7_tasks(
             print(f"取得七日簽到狀態失敗：{exc}", file=sys.stderr)
 
     return [build_day7_task(uid, current_taipei_checkin_day())]
+
+
+def resolve_vip_level(
+    uid: str,
+    *,
+    fallback_vip_level: int,
+    user_agent: str,
+    timeout: float,
+    ssl_context: ssl.SSLContext | None,
+    dry_run: bool,
+    quiet: bool,
+) -> int:
+    if dry_run:
+        return fallback_vip_level
+
+    status_task = build_vip_status_task(uid)
+    if not quiet:
+        print("\n[0/8] 取得 VIP 等級資料")
+        print(f"POST {status_task.url}")
+        print(json.dumps(status_task.payload, ensure_ascii=False, indent=2))
+
+    try:
+        status, text = post_json(uid, status_task, user_agent, timeout, ssl_context)
+        if not quiet:
+            print(f"HTTP {status}: {text}")
+        chosen_level = choose_vip_level_from_status(text)
+        if chosen_level is not None:
+            return chosen_level
+    except (json.JSONDecodeError, TypeError, urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+        if not quiet:
+            print(f"取得 VIP 等級資料失敗：{exc}", file=sys.stderr)
+
+    return fallback_vip_level
 
 
 def main() -> int:

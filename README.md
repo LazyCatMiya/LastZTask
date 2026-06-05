@@ -162,12 +162,14 @@ Optional arguments:
 python3 lastz_tasks.py 1556975198000136 --vip-level 1 --delay 1.2
 ```
 
-The check-in task first calls `getday7.php` by default. It runs all rewards with `status: -1` first, then runs rewards with `status: 3` as makeup check-ins. To override the day manually:
+The check-in task first calls `getday7.php` by default. It runs all rewards with `status: 1` as today's normal check-in, then tries rewards with `status: -1` as makeup check-ins. If there is no `status: 1`, the normal check-in is treated as already completed for today. To override the day manually:
 
 ```bash
 python3 lastz_tasks.py 1556975198000136 --day 5 --insecure
 python3 run_daily_tasks.py --day 5 --insecure
 ```
+
+The weekly VIP package calls `getvip.php` first and uses the top-level `vlevel` value from that response. `--vip-level` is only used as a fallback if the VIP level lookup fails or the response format is invalid.
 
 ### Gift Codes
 
@@ -414,12 +416,14 @@ python3 lastz_tasks.py
 python3 lastz_tasks.py 1556975198000136 --vip-level 1 --delay 1.2
 ```
 
-七日簽到預設會先呼叫 `getday7.php` 取得狀態；會先執行所有 `status: -1`，再執行 `status: 3` 作為補簽。如果要手動覆蓋 day：
+七日簽到預設會先呼叫 `getday7.php` 取得狀態；會先執行所有 `status: 1` 作為今天的正常簽到，再嘗試執行 `status: -1` 作為補簽。如果沒有 `status: 1`，正常簽到會視為今天已經簽過。如果要手動覆蓋 day：
 
 ```bash
 python3 lastz_tasks.py 1556975198000136 --day 5 --insecure
 python3 run_daily_tasks.py --day 5 --insecure
 ```
+
+每週特權禮包會先呼叫 `getvip.php`，並直接使用該回傳最外層的 `vlevel`。`--vip-level` 只會在 VIP 等級查詢失敗或回傳格式不正確時作為 fallback。
 
 ### 兌換不定期禮包碼
 

@@ -122,6 +122,7 @@
             taskBuy1000: "任務：購買任意禮包或金磚 > 1000",
             taskFirst2000: "任務：首次購買金磚 > 2000",
             taskVipWeek: "領取每週特權禮包",
+            taskVipStatus: "取得 VIP 等級資料",
             taskRedeemGift: "領取禮物碼",
             taskBuyOrangeGear: "用積分購買橙裝",
             taskLookupUser: "搜尋用戶名稱",
@@ -161,6 +162,7 @@
             taskBuy1000: "Task: buy any package or gold bricks > 1000",
             taskFirst2000: "Task: first gold bricks purchase > 2000",
             taskVipWeek: "Claim weekly VIP package",
+            taskVipStatus: "Get VIP level data",
             taskRedeemGift: "Redeem gift code",
             taskBuyOrangeGear: "Buy orange gear with points",
             taskLookupUser: "Look up user name",
@@ -415,7 +417,7 @@
             nameKey: "taskVipWeek",
             method: "POST",
             url: `${STORE_ORIGIN}/sendvip.php`,
-            body: uid => ({uid, vlevel: 1, type: "week", lang: "hk"}),
+            body: (uid, vipLevel = -1) => ({uid, vlevel: vipLevel, type: "week", lang: "hk"}),
         },
     ];
 
@@ -473,12 +475,17 @@
     function chooseDay7Rewards(body) {
         const rewards = Array.isArray(body && body.reward) ? body.reward : [];
         const normal = rewards
-            .filter(reward => reward && reward.status === -1)
+            .filter(reward => reward && reward.status === 1)
             .map(reward => ({day: Number(reward.day), dtype: 0}));
         const makeup = rewards
-            .filter(reward => reward && reward.status === 3)
+            .filter(reward => reward && reward.status === -1)
             .map(reward => ({day: Number(reward.day), dtype: 1}));
         return [...normal, ...makeup];
+    }
+
+    function chooseVipLevel(body, fallbackLevel = 1) {
+        const vipLevel = Number(body && body.vlevel);
+        return Number.isFinite(vipLevel) ? vipLevel : fallbackLevel;
     }
 
     async function readResponse(response) {
@@ -518,13 +525,28 @@
 
     function isSuccessBody(body) {
         if (!body || typeof body !== "object") return false;
+        if (body.code === 10018 && body.message === "task forever sql fail") return true;
+        if (body.code === 10018 && body.message === "week sql fail") return true;
         if (Object.prototype.hasOwnProperty.call(body, "code")) return body.code === 0;
         if (Object.prototype.hasOwnProperty.call(body, "shopConfig")) return true;
+        if (Array.isArray(body.rewardWeekConfig) || Array.isArray(body.rewardForeverConfig)) return true;
         return false;
     }
 
     function translatedLine(language, lines) {
         return lines[language] || lines.en || lines.zh || "";
+    }
+
+    function dayLabel(result, language) {
+        const day = Number(result.day);
+        if (!Number.isFinite(day)) return "";
+        return translatedLine(language, {zh: `第 ${day} 天`, en: `Day ${day}`});
+    }
+
+    function appendDay(message, result, language) {
+        const label = dayLabel(result, language);
+        if (!label) return message;
+        return language === "zh" ? `${message}${label}` : `${message} ${label}.`;
     }
 
     function friendlyResponseMessage(result, taskKey, language) {
@@ -533,16 +555,17 @@
         const code = result.body.code;
         const message = result.body.message;
         if (code === 0) {
+            if (taskKey === "taskDay7") return appendDay(translatedLine(language, {zh: "簽到完成！", en: "Check-in complete!"}), result, language);
+            if (taskKey === "taskDay7Makeup") return appendDay(translatedLine(language, {zh: "補簽完成！", en: "Makeup check-in complete!"}), result, language);
             const successMessages = {
-                taskDay7: {zh: "簽到完成！", en: "Check-in complete!"},
                 taskDay7Done: {zh: "今天簽過了！", en: "Already checked in today!"},
-                taskDay7Makeup: {zh: "補簽完成！", en: "Makeup check-in complete!"},
                 taskLogin: {zh: "登入完成！", en: "Login task complete!"},
                 taskViewUcenter: {zh: "會員中心逛完了！", en: "Member center visited!"},
                 taskViewShop: {zh: "商城逛完了！", en: "Shop visited!"},
                 taskBuy1000: {zh: "買夠了，任務完成！", en: "Purchase task complete!"},
                 taskFirst2000: {zh: "首次 2000 任務完成！", en: "First 2000 task complete!"},
                 taskVipWeek: {zh: "每週禮包領到惹！", en: "Weekly package claimed!"},
+                taskVipStatus: {zh: "VIP 等級取得完成！", en: "VIP level data loaded!"},
                 taskBuyOrangeGear: {zh: "購買完成！", en: "Purchase complete!"},
             };
             if (successMessages[taskKey]) return translatedLine(language, successMessages[taskKey]);
@@ -551,10 +574,21 @@
         if (taskKey === "taskRedeemGift" && result.body.errorCode === "E006" && message === "code already exchanged") return translatedLine(language, {zh: "領過了啦！", en: "Already claimed!"});
         if (taskKey === "taskLookupUser" && code === 10018 && message === "get user fail") return translatedLine(language, {zh: "你沒有名字...", en: "You have no name..."});
         if (taskKey === "taskDay7Status" && Array.isArray(result.body.reward)) return translatedLine(language, {zh: "狀態取得完成！", en: "Status loaded!"});
+        if (taskKey === "taskVipStatus" && (Array.isArray(result.body.rewardWeekConfig) || Array.isArray(result.body.rewardForeverConfig))) {
+            const vipLevel = result.body.vlevel;
+            if (vipLevel !== undefined && vipLevel !== null) {
+                return translatedLine(language, {
+                    zh: `VIP 等級取得完成！當前 VIP 等級為 ${vipLevel}`,
+                    en: `VIP level data loaded! Current VIP level is ${vipLevel}.`,
+                });
+            }
+            return translatedLine(language, {zh: "VIP 等級取得完成！", en: "VIP level data loaded!"});
+        }
+        if (taskKey === "taskVipWeek" && code === 10018 && message === "week sql fail") return translatedLine(language, {zh: "已領取特權禮包！", en: "VIP package already claimed!"});
         if (code === 10018 && message === "task forever sql fail") return translatedLine(language, {zh: "今天已經領過惹！", en: "Already claimed today!"});
-        if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002001 && message === "send day fail") return translatedLine(language, {zh: "不是現在該簽的日子", en: "This is not the day to check in."});
-        if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002040 && message === "task forever insert fail") return translatedLine(language, {zh: "今天已經簽過這天了", en: "You already checked in for this day."});
-        if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002001 && message === "day fail") return translatedLine(language, {zh: "這是明天，所以基本上不該出現！", en: "This is tomorrow, so this basically should not appear!"});
+        if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002001 && message === "send day fail") return appendDay(translatedLine(language, {zh: "不是現在該簽的日子，", en: "This is not the day to check in."}), result, language);
+        if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002040 && message === "task forever insert fail") return appendDay(translatedLine(language, {zh: "今天已經簽過這天了，", en: "You already checked in for this day."}), result, language);
+        if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002001 && message === "day fail") return appendDay(translatedLine(language, {zh: "這是明天，所以基本上不該出現！", en: "This is tomorrow, so this basically should not appear!"}), result, language);
         if (taskKey === "taskBuy1000" && code === 10002038 && message === "get task type buy1000 fail") return translatedLine(language, {zh: "你今天還沒買夠！", en: "You have not bought enough today!"});
         if (taskKey === "taskFirst2000" && code === 10002038 && message === "get task type first2000 fail") return translatedLine(language, {zh: "魔法小卡拿出來！", en: "Time to bring out the magic card!"});
         if (taskKey === "taskVipWeek" && code === 10002001 && message === "vip level fail") return translatedLine(language, {zh: "VIP 等級錯誤！", en: "VIP level is incorrect!"});
@@ -703,6 +737,77 @@
             return {response, ok: isSuccessBody(response.body)};
         }
 
+        async function runVipWeekForAccount(account) {
+            let okCount = 0;
+            let totalCount = 1;
+            const statusId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-vip-status`;
+            setResults(previous => [...previous, {
+                id: statusId,
+                accountLabel: accountLabel(account),
+                nameKey: "taskVipStatus",
+                method: "POST",
+                state: "running",
+                detail: t("waiting"),
+            }]);
+
+            let vipLevel = 1;
+            try {
+                const response = await postJson(account.uid, `${STORE_ORIGIN}/getvip.php`, {uid: account.uid});
+                const ok = isSuccessBody(response.body);
+                if (ok) {
+                    okCount += 1;
+                    vipLevel = chooseVipLevel(response.body, vipLevel);
+                }
+                setResults(previous => previous.map(result => (
+                    result.id === statusId
+                        ? {...result, state: ok ? "ok" : "bad", response}
+                        : result
+                )));
+            } catch (error) {
+                setResults(previous => previous.map(result => (
+                    result.id === statusId ? {...result, state: "bad", error: error.message} : result
+                )));
+            }
+
+            await wait(450);
+
+            totalCount += 1;
+            const resultId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-vip-week`;
+            setResults(previous => [...previous, {
+                id: resultId,
+                accountLabel: accountLabel(account),
+                nameKey: "taskVipWeek",
+                method: "POST",
+                state: "running",
+                detail: `vlevel ${vipLevel}`,
+            }]);
+
+            try {
+                const response = await postJson(account.uid, `${STORE_ORIGIN}/sendvip.php`, {
+                    uid: account.uid,
+                    vlevel: vipLevel,
+                    type: "week",
+                    lang: "hk",
+                });
+                const ok = isSuccessBody(response.body);
+                if (ok) {
+                    okCount += 1;
+                    celebrate();
+                }
+                setResults(previous => previous.map(result => (
+                    result.id === resultId
+                        ? {...result, state: ok ? "ok" : "bad", response}
+                        : result
+                )));
+            } catch (error) {
+                setResults(previous => previous.map(result => (
+                    result.id === resultId ? {...result, state: "bad", error: error.message} : result
+                )));
+            }
+
+            return {okCount, totalCount};
+        }
+
         async function runDay7TasksForAccount(account) {
             let okCount = 0;
             let totalCount = 1;
@@ -736,7 +841,8 @@
                 return {okCount, totalCount};
             }
 
-            if (choices.length === 0) {
+            const hasNormalCheckIn = choices.some(choice => choice.dtype === 0);
+            if (!hasNormalCheckIn) {
                 const doneId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-day7-done`;
                 totalCount += 1;
                 okCount += 1;
@@ -746,7 +852,7 @@
                     nameKey: "taskDay7Done",
                     method: "POST",
                     state: "ok",
-                    response: {status: 200, body: {code: 0, message: "no status -1 or 3"}},
+                    response: {status: 200, body: {code: 0, message: "no status 1 or -1"}},
                 }]);
             }
 
@@ -772,7 +878,7 @@
                     }
                     setResults(previous => previous.map(result => (
                         result.id === resultId
-                            ? {...result, state: ok ? "ok" : "bad", response}
+                            ? {...result, state: ok ? "ok" : "bad", response: {...response, day: choice.day}}
                             : result
                     )));
                 } catch (error) {
@@ -862,6 +968,14 @@
                         const day7Result = await runDay7TasksForAccount(account);
                         okCount += day7Result.okCount;
                         totalCount += day7Result.totalCount;
+                        await wait(450);
+                        continue;
+                    }
+
+                    if (task.nameKey === "taskVipWeek") {
+                        const vipResult = await runVipWeekForAccount(account);
+                        okCount += vipResult.okCount;
+                        totalCount += vipResult.totalCount;
                         await wait(450);
                         continue;
                     }
