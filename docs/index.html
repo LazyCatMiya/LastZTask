@@ -490,43 +490,47 @@
         return false;
     }
 
-    function friendlyResponseMessage(result, taskKey) {
+    function translatedLine(language, lines) {
+        return lines[language] || lines.en || lines.zh || "";
+    }
+
+    function friendlyResponseMessage(result, taskKey, language) {
         if (!result.body || typeof result.body !== "object") return "";
 
         const code = result.body.code;
         const message = result.body.message;
         if (code === 0) {
             const successMessages = {
-                taskDay7: "簽到完成！",
-                taskLogin: "登入完成！",
-                taskViewUcenter: "會員中心逛完了！",
-                taskViewShop: "商城逛完了！",
-                taskBuy1000: "買夠了，任務完成！",
-                taskFirst2000: "首次 2000 任務完成！",
-                taskVipWeek: "每週禮包領到惹！",
-                taskBuyOrangeGear: "購買完成！",
+                taskDay7: {zh: "簽到完成！", en: "Check-in complete!"},
+                taskLogin: {zh: "登入完成！", en: "Login task complete!"},
+                taskViewUcenter: {zh: "會員中心逛完了！", en: "Member center visited!"},
+                taskViewShop: {zh: "商城逛完了！", en: "Shop visited!"},
+                taskBuy1000: {zh: "買夠了，任務完成！", en: "Purchase task complete!"},
+                taskFirst2000: {zh: "首次 2000 任務完成！", en: "First 2000 task complete!"},
+                taskVipWeek: {zh: "每週禮包領到惹！", en: "Weekly package claimed!"},
+                taskBuyOrangeGear: {zh: "購買完成！", en: "Purchase complete!"},
             };
-            if (successMessages[taskKey]) return successMessages[taskKey];
+            if (successMessages[taskKey]) return translatedLine(language, successMessages[taskKey]);
         }
-        if (taskKey === "taskRedeemGift" && result.body.errorCode === "ok") return "領取完成！";
-        if (taskKey === "taskRedeemGift" && result.body.errorCode === "E006" && message === "code already exchanged") return "領過了啦！";
-        if (taskKey === "taskLookupUser" && code === 10018 && message === "get user fail") return "你沒有名字...";
-        if (code === 10018 && message === "task forever sql fail") return "今天已經領過惹！";
-        if (taskKey === "taskDay7" && code === 10002001 && message === "send day fail") return "今天已經簽到惹";
-        if (taskKey === "taskDay7" && code === 10002040 && message === "task forever insert fail") return "簽過了啦！";
-        if (taskKey === "taskBuy1000" && code === 10002038 && message === "get task type buy1000 fail") return "你今天還沒買夠！";
-        if (taskKey === "taskFirst2000" && code === 10002038 && message === "get task type first2000 fail") return "魔法小卡拿出來！";
-        if (taskKey === "taskVipWeek" && code === 10002001 && message === "vip level fail") return "VIP 等級錯誤！";
-        if (taskKey === "taskBuyOrangeGear" && code === 10002036 && message === "score fail") return "積分不夠！";
+        if (taskKey === "taskRedeemGift" && result.body.errorCode === "ok") return translatedLine(language, {zh: "領取完成！", en: "Claim complete!"});
+        if (taskKey === "taskRedeemGift" && result.body.errorCode === "E006" && message === "code already exchanged") return translatedLine(language, {zh: "領過了啦！", en: "Already claimed!"});
+        if (taskKey === "taskLookupUser" && code === 10018 && message === "get user fail") return translatedLine(language, {zh: "你沒有名字...", en: "You have no name..."});
+        if (code === 10018 && message === "task forever sql fail") return translatedLine(language, {zh: "今天已經領過惹！", en: "Already claimed today!"});
+        if (taskKey === "taskDay7" && code === 10002001 && message === "send day fail") return translatedLine(language, {zh: "今天已經簽到惹", en: "Already checked in today!"});
+        if (taskKey === "taskDay7" && code === 10002040 && message === "task forever insert fail") return translatedLine(language, {zh: "簽過了啦！", en: "Already checked in!"});
+        if (taskKey === "taskBuy1000" && code === 10002038 && message === "get task type buy1000 fail") return translatedLine(language, {zh: "你今天還沒買夠！", en: "You have not bought enough today!"});
+        if (taskKey === "taskFirst2000" && code === 10002038 && message === "get task type first2000 fail") return translatedLine(language, {zh: "魔法小卡拿出來！", en: "Time to bring out the magic card!"});
+        if (taskKey === "taskVipWeek" && code === 10002001 && message === "vip level fail") return translatedLine(language, {zh: "VIP 等級錯誤！", en: "VIP level is incorrect!"});
+        if (taskKey === "taskBuyOrangeGear" && code === 10002036 && message === "score fail") return translatedLine(language, {zh: "積分不夠！", en: "Not enough points!"});
         return "";
     }
 
-    function formatResponse(result, taskKey = "") {
-        const friendlyMessage = friendlyResponseMessage(result, taskKey);
+    function formatResponse(result, taskKey = "", language = "zh") {
+        const friendlyMessage = friendlyResponseMessage(result, taskKey, language);
         if (friendlyMessage) return friendlyMessage;
 
         if (taskKey === "taskGetShop" && result.body && typeof result.body === "object" && Array.isArray(result.body.shopConfig)) {
-            return "我進來了！";
+            return translatedLine(language, {zh: "我進來了！", en: "I'm in!"});
         }
 
         if (result.body && typeof result.body === "object" && Array.isArray(result.body.shopConfig)) {
@@ -639,6 +643,13 @@
             });
         }
 
+        function resultDetail(result) {
+            if (result.state === "running") return t("waiting");
+            if (result.error) return result.error;
+            if (result.response) return formatResponse(result.response, result.nameKey, language);
+            return result.detail || "";
+        }
+
         function accountLabel(account) {
             const displayName = account.name ? `${account.name}` : "";
             const prefix = account.abbr ? `[${account.abbr}] ` : "";
@@ -675,7 +686,8 @@
                             ...result,
                             accountLabel: accountLabel(account),
                             state: ok ? "ok" : "bad",
-                            detail: ok ? accountFullLabel(account) : formatResponse(response, "taskLookupUser"),
+                            detail: ok ? accountFullLabel(account) : "",
+                            response: ok ? null : response,
                         }
                         : result
                 )));
@@ -683,7 +695,7 @@
             } catch (error) {
                 setResults(previous => previous.map(result => (
                     result.id === id
-                        ? {...result, state: "bad", detail: error.message}
+                        ? {...result, state: "bad", error: error.message}
                         : result
                 )));
                 return fallbackAccount;
@@ -728,13 +740,13 @@
                         }
                         setResults(previous => previous.map(result => (
                             result.id === id
-                                ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response, task.nameKey)}
+                                ? {...result, state: ok ? "ok" : "bad", response}
                                 : result
                         )));
                     } catch (error) {
                         setResults(previous => previous.map(result => (
                             result.id === id
-                                ? {...result, state: "bad", detail: error.message}
+                                ? {...result, state: "bad", error: error.message}
                                 : result
                         )));
                     }
@@ -797,12 +809,12 @@
                     }
                     setResults(previous => previous.map(result => (
                         result.id === id
-                            ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response, "taskRedeemGift")}
+                            ? {...result, state: ok ? "ok" : "bad", response}
                             : result
                     )));
                 } catch (error) {
                     setResults(previous => previous.map(result => (
-                        result.id === id ? {...result, state: "bad", detail: error.message} : result
+                        result.id === id ? {...result, state: "bad", error: error.message} : result
                     )));
                 }
 
@@ -850,12 +862,12 @@
                     }
                     setResults(previous => previous.map(result => (
                         result.id === id
-                            ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response, task.nameKey)}
+                            ? {...result, state: ok ? "ok" : "bad", response}
                             : result
                     )));
                 } catch (error) {
                     setResults(previous => previous.map(result => (
-                        result.id === id ? {...result, state: "bad", detail: error.message} : result
+                        result.id === id ? {...result, state: "bad", error: error.message} : result
                     )));
                 }
 
@@ -977,6 +989,7 @@
                                     key: result.id,
                                     result,
                                     name: t(result.nameKey),
+                                    detail: resultDetail(result),
                                 })),
                             h("div", {ref: resultsEndRef, "aria-hidden": true}),
                         ),
@@ -1018,7 +1031,7 @@
         );
     }
 
-    function ResultItem({result, name}) {
+    function ResultItem({result, name, detail}) {
         return h("article", {className: "grid animate-resultIn grid-cols-[28px_minmax(0,1fr)_auto] items-start gap-2.5 rounded-lg border border-line bg-white p-3"},
             h("div", {className: `grid h-[26px] w-[26px] place-items-center rounded-full text-sm font-extrabold text-white ${badgeClass(result.state)}`}, stateIcon(result.state)),
             h("div", null,
@@ -1026,7 +1039,7 @@
                     ? h("p", {className: "mb-1 break-words text-[11px] font-extrabold leading-tight text-brand"}, result.accountLabel)
                     : null,
                 h("p", {className: "m-0 text-sm font-extrabold leading-tight"}, name),
-                h("p", {className: "mt-1 break-words font-mono text-xs leading-relaxed text-muted"}, result.detail),
+                h("p", {className: "mt-1 break-words font-mono text-xs leading-relaxed text-muted"}, detail),
             ),
             h("span", {className: "text-xs font-extrabold text-muted"}, result.method),
         );
