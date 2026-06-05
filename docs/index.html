@@ -602,12 +602,15 @@
         }
 
         function accountLabel(account) {
-            return account.name ? `${account.name} · ${account.uid}` : account.uid;
+            const displayName = account.name ? `${account.name}` : "";
+            const prefix = account.abbr ? `[${account.abbr}] ` : "";
+            const namePart = displayName || prefix ? `${prefix}${displayName}` : "";
+            return namePart ? `${namePart} · ${account.uid}` : account.uid;
         }
 
         async function lookupAccount(userId) {
             const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${userId}-lookup`;
-            const fallbackAccount = {uid: userId, name: "", lookupOk: false};
+            const fallbackAccount = {uid: userId, name: "", abbr: "", lookupOk: false};
             setResults(previous => [...previous, {
                 id,
                 accountLabel: userId,
@@ -619,9 +622,11 @@
 
             try {
                 const response = await postJson(userId, `${STORE_ORIGIN}/getuserhome.php`, {uid: userId});
-                const name = response.body && response.body.info && response.body.info.name ? response.body.info.name : "";
+                const info = response.body && response.body.info ? response.body.info : {};
+                const name = info.name ? info.name : "";
+                const abbr = info.abbr ? info.abbr : "";
                 const ok = response.body && response.body.code === 0;
-                const account = {uid: userId, name, lookupOk: ok};
+                const account = {uid: userId, name, abbr, lookupOk: ok};
                 setResults(previous => previous.map(result => (
                     result.id === id
                         ? {
