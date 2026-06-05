@@ -605,7 +605,11 @@
             const displayName = account.name ? `${account.name}` : "";
             const prefix = account.abbr ? `[${account.abbr}] ` : "";
             const namePart = displayName || prefix ? `${prefix}${displayName}` : "";
-            return namePart ? `${namePart} · ${account.uid}` : account.uid;
+            return namePart || account.uid;
+        }
+
+        function accountFullLabel(account) {
+            return `${accountLabel(account)} · ${account.uid}`;
         }
 
         async function lookupAccount(userId) {
@@ -633,7 +637,7 @@
                             ...result,
                             accountLabel: accountLabel(account),
                             state: ok ? "ok" : "bad",
-                            detail: ok ? accountLabel(account) : formatResponse(response),
+                            detail: ok ? accountFullLabel(account) : formatResponse(response),
                         }
                         : result
                 )));
