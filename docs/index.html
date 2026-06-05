@@ -4,6 +4,20 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LastZ Task Runner</title>
+    <meta name="description" content="A cute LastZ task helper for running website tasks, redeeming gift codes, and triggering manual shop actions from a simple GitHub Pages interface.">
+    <meta name="application-name" content="LastZ Task Runner">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#277A6A">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:site_name" content="LastZ Task Runner">
+    <meta property="og:title" content="LastZ Task Runner">
+    <meta property="og:description" content="官網任務與禮物碼領取，一個簡單可愛的 LastZ 任務輔助頁面。">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="LastZ Task Runner">
+    <meta name="twitter:description" content="官網任務與禮物碼領取，一個簡單可愛的 LastZ 任務輔助頁面。">
+    <link rel="icon" type="image/png" href="image.png?v=20260605">
+    <link rel="apple-touch-icon" href="image.png?v=20260605">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;800&family=Nunito:wght@500;700;800;900&display=swap"
@@ -727,8 +741,13 @@
         return h("main", {className: "mx-auto w-[min(1120px,calc(100vw-32px))] py-7 text-ink md:py-9"},
             h("header", {className: "flex min-h-[52px] flex-col gap-4 border-b border-line pb-4 md:flex-row md:items-center md:justify-between"},
                 h("div", {className: "flex min-w-0 items-center gap-3"},
-                    h("div", {className: "grid h-[46px] w-[46px] animate-catWiggle place-items-center rounded-lg bg-brand text-white shadow-soft"},
-                        h(Icon, {icon: "fa6-solid:cat", className: "h-7 w-7"}),
+                    h("div", {className: "grid h-[46px] w-[46px] animate-catWiggle place-items-center overflow-hidden rounded-lg bg-brandSoft shadow-soft"},
+                        h("img", {
+                            src: "image.png",
+                            alt: "",
+                            className: "h-full w-full object-cover",
+                            "aria-hidden": true,
+                        }),
                     ),
                     h("div", null,
                         h("h1", {className: "m-0 flex items-center gap-2 text-[clamp(20px,3vw,28px)] font-black leading-none tracking-normal"},

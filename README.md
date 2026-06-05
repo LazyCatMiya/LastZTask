@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/image.png" alt="LastZ Task Runner logo" width="96">
+</p>
+
 # LastZ Task API Script
 
 <p>
