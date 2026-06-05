@@ -94,6 +94,7 @@
             controls: "操作",
             userId: "User ID",
             giftCode: "禮物碼",
+            userIdHelp: "可輸入多組 ID，用逗號、空格或換行分隔",
             runTasks: "完成官網任務",
             redeemGift: "領取禮物碼",
             buyOrangeGear: "用積分購買橙裝",
@@ -121,12 +122,14 @@
             taskVipWeek: "領取每週特權禮包",
             taskRedeemGift: "領取禮物碼",
             taskBuyOrangeGear: "用積分購買橙裝",
+            taskLookupUser: "搜尋用戶名稱",
         },
         en: {
         subtitle: "Website tasks and gift code redemption",
             controls: "Controls",
             userId: "User ID",
             giftCode: "Gift Code",
+            userIdHelp: "Enter multiple IDs separated by commas, spaces, or new lines",
             runTasks: "Complete Website Tasks",
             redeemGift: "Redeem Gift Code",
             buyOrangeGear: "Buy Orange Gear with Points",
@@ -154,6 +157,7 @@
             taskVipWeek: "Claim weekly VIP package",
             taskRedeemGift: "Redeem gift code",
             taskBuyOrangeGear: "Buy orange gear with points",
+            taskLookupUser: "Look up user name",
         },
     };
 
@@ -440,6 +444,10 @@
         return Math.floor(Math.random() * validationLines.length);
     }
 
+    function parseUserIds(value) {
+        return Array.from(new Set(value.split(/[\s,，]+/).map(item => item.trim()).filter(Boolean)));
+    }
+
     async function readResponse(response) {
         const text = await response.text();
         let body = text;
@@ -569,15 +577,15 @@
             localStorage.setItem(USER_STORAGE_KEY, nextUid.trim());
         }
 
-        function requireUid() {
-            const cleanUid = uid.trim();
-            if (!cleanUid) {
+        function requireUserIds() {
+            const userIds = parseUserIds(uid);
+            if (userIds.length === 0) {
                 setStatus({state: "bad", key: "missingUserId", params: {}});
                 showValidationMessage();
-                return "";
+                return [];
             }
-            localStorage.setItem(USER_STORAGE_KEY, cleanUid);
-            return cleanUid;
+            localStorage.setItem(USER_STORAGE_KEY, userIds.join(", "));
+            return userIds;
         }
 
         function showValidationMessage() {
@@ -593,9 +601,51 @@
             });
         }
 
+        function accountLabel(account) {
+            return account.name ? `${account.name} · ${account.uid}` : account.uid;
+        }
+
+        async function lookupAccount(userId) {
+            const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${userId}-lookup`;
+            const fallbackAccount = {uid: userId, name: "", lookupOk: false};
+            setResults(previous => [...previous, {
+                id,
+                accountLabel: userId,
+                nameKey: "taskLookupUser",
+                method: "POST",
+                state: "running",
+                detail: t("waiting"),
+            }]);
+
+            try {
+                const response = await postJson(userId, `${STORE_ORIGIN}/getuserhome.php`, {uid: userId});
+                const name = response.body && response.body.info && response.body.info.name ? response.body.info.name : "";
+                const ok = response.body && response.body.code === 0;
+                const account = {uid: userId, name, lookupOk: ok};
+                setResults(previous => previous.map(result => (
+                    result.id === id
+                        ? {
+                            ...result,
+                            accountLabel: accountLabel(account),
+                            state: ok ? "ok" : "bad",
+                            detail: ok ? accountLabel(account) : formatResponse(response),
+                        }
+                        : result
+                )));
+                return account;
+            } catch (error) {
+                setResults(previous => previous.map(result => (
+                    result.id === id
+                        ? {...result, state: "bad", detail: error.message}
+                        : result
+                )));
+                return fallbackAccount;
+            }
+        }
+
         async function runWebsiteTasks() {
-            const cleanUid = requireUid();
-            if (!cleanUid) return;
+            const userIds = requireUserIds();
+            if (userIds.length === 0) return;
 
             setBusy(true);
             setResults([]);
@@ -605,52 +655,59 @@
             revealResults();
 
             let okCount = 0;
-            for (const task of taskDefinitions) {
-                const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${task.nameKey}`;
-                const pendingResult = {
-                    id,
-                    nameKey: task.nameKey,
-                    method: task.method,
-                    state: "running",
-                    detail: t("waiting"),
-                };
-                setResults(previous => [...previous, pendingResult]);
+            const totalCount = userIds.length * (taskDefinitions.length + 1);
+            for (const userId of userIds) {
+                const account = await lookupAccount(userId);
+                if (account.lookupOk) okCount += 1;
 
-                try {
-                    const response = await postJson(cleanUid, task.url, task.body(cleanUid));
-                    const ok = isSuccessBody(response.body);
-                    if (ok) {
-                        okCount += 1;
-                        celebrate();
+                for (const task of taskDefinitions) {
+                    const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-${task.nameKey}`;
+                    const pendingResult = {
+                        id,
+                        accountLabel: accountLabel(account),
+                        nameKey: task.nameKey,
+                        method: task.method,
+                        state: "running",
+                        detail: t("waiting"),
+                    };
+                    setResults(previous => [...previous, pendingResult]);
+
+                    try {
+                        const response = await postJson(account.uid, task.url, task.body(account.uid));
+                        const ok = isSuccessBody(response.body);
+                        if (ok) {
+                            okCount += 1;
+                            celebrate();
+                        }
+                        setResults(previous => previous.map(result => (
+                            result.id === id
+                                ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response)}
+                                : result
+                        )));
+                    } catch (error) {
+                        setResults(previous => previous.map(result => (
+                            result.id === id
+                                ? {...result, state: "bad", detail: error.message}
+                                : result
+                        )));
                     }
-                    setResults(previous => previous.map(result => (
-                        result.id === id
-                            ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response)}
-                            : result
-                    )));
-                } catch (error) {
-                    setResults(previous => previous.map(result => (
-                        result.id === id
-                            ? {...result, state: "bad", detail: error.message}
-                            : result
-                    )));
-                }
 
-                await wait(450);
+                    await wait(450);
+                }
             }
 
             setStatus({
-                state: okCount === taskDefinitions.length ? "ok" : "bad",
+                state: okCount === totalCount ? "ok" : "bad",
                 key: "done",
-                params: {ok: okCount, total: taskDefinitions.length},
+                params: {ok: okCount, total: totalCount},
             });
             setBusy(false);
         }
 
         async function redeemGiftCode() {
-            const cleanUid = requireUid();
+            const userIds = requireUserIds();
             const cleanCode = giftCode.trim();
-            if (!cleanUid) return;
+            if (userIds.length === 0) return;
             if (!cleanCode) {
                 setStatus({state: "bad", key: "missingInput", params: {}});
                 showValidationMessage();
@@ -664,42 +721,54 @@
             setStatus({state: "running", key: "redeeming", params: {}});
             revealResults();
 
-            const url = new URL(`${GIFT_ORIGIN}/code.php`);
-            url.searchParams.set("uid", cleanUid);
-            url.searchParams.set("code", cleanCode);
+            let okCount = 0;
+            const totalCount = userIds.length * 2;
+            for (const userId of userIds) {
+                const account = await lookupAccount(userId);
+                if (account.lookupOk) okCount += 1;
 
-            const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-gift`;
-            setResults([{
-                id,
-                nameKey: "taskRedeemGift",
-                method: "GET",
-                state: "running",
-                detail: t("waiting"),
-            }]);
+                const url = new URL(`${GIFT_ORIGIN}/code.php`);
+                url.searchParams.set("uid", account.uid);
+                url.searchParams.set("code", cleanCode);
 
-            try {
-                const response = await getJson(cleanUid, url.toString());
-                const ok = response.body && response.body.errorCode === "ok";
-                if (ok) celebrate();
-                setResults(previous => previous.map(result => (
-                    result.id === id
-                        ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response)}
-                        : result
-                )));
-                setStatus({state: ok ? "ok" : "bad", key: ok ? "redeemed" : "failed", params: {}});
-            } catch (error) {
-                setResults(previous => previous.map(result => (
-                    result.id === id ? {...result, state: "bad", detail: error.message} : result
-                )));
-                setStatus({state: "bad", key: "failed", params: {}});
+                const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-gift`;
+                setResults(previous => [...previous, {
+                    id,
+                    accountLabel: accountLabel(account),
+                    nameKey: "taskRedeemGift",
+                    method: "GET",
+                    state: "running",
+                    detail: t("waiting"),
+                }]);
+
+                try {
+                    const response = await getJson(account.uid, url.toString());
+                    const ok = response.body && response.body.errorCode === "ok";
+                    if (ok) {
+                        okCount += 1;
+                        celebrate();
+                    }
+                    setResults(previous => previous.map(result => (
+                        result.id === id
+                            ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response)}
+                            : result
+                    )));
+                } catch (error) {
+                    setResults(previous => previous.map(result => (
+                        result.id === id ? {...result, state: "bad", detail: error.message} : result
+                    )));
+                }
+
+                await wait(450);
             }
 
+            setStatus({state: okCount === totalCount ? "ok" : "bad", key: okCount === totalCount ? "redeemed" : "failed", params: {}});
             setBusy(false);
         }
 
         async function buyOrangeGear() {
-            const cleanUid = requireUid();
-            if (!cleanUid) return;
+            const userIds = requireUserIds();
+            if (userIds.length === 0) return;
 
             setBusy(true);
             setResults([]);
@@ -709,32 +778,44 @@
             revealResults();
 
             const task = manualActions.buyOrangeGear;
-            const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${task.nameKey}`;
-            setResults([{
-                id,
-                nameKey: task.nameKey,
-                method: task.method,
-                state: "running",
-                detail: t("waiting"),
-            }]);
+            let okCount = 0;
+            const totalCount = userIds.length * 2;
+            for (const userId of userIds) {
+                const account = await lookupAccount(userId);
+                if (account.lookupOk) okCount += 1;
 
-            try {
-                const response = await postJson(cleanUid, task.url, task.body(cleanUid));
-                const ok = isSuccessBody(response.body);
-                if (ok) celebrate();
-                setResults(previous => previous.map(result => (
-                    result.id === id
-                        ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response)}
-                        : result
-                )));
-                setStatus({state: ok ? "ok" : "bad", key: ok ? "boughtOrangeGear" : "failed", params: {}});
-            } catch (error) {
-                setResults(previous => previous.map(result => (
-                    result.id === id ? {...result, state: "bad", detail: error.message} : result
-                )));
-                setStatus({state: "bad", key: "failed", params: {}});
+                const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-${task.nameKey}`;
+                setResults(previous => [...previous, {
+                    id,
+                    accountLabel: accountLabel(account),
+                    nameKey: task.nameKey,
+                    method: task.method,
+                    state: "running",
+                    detail: t("waiting"),
+                }]);
+
+                try {
+                    const response = await postJson(account.uid, task.url, task.body(account.uid));
+                    const ok = isSuccessBody(response.body);
+                    if (ok) {
+                        okCount += 1;
+                        celebrate();
+                    }
+                    setResults(previous => previous.map(result => (
+                        result.id === id
+                            ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response)}
+                            : result
+                    )));
+                } catch (error) {
+                    setResults(previous => previous.map(result => (
+                        result.id === id ? {...result, state: "bad", detail: error.message} : result
+                    )));
+                }
+
+                await wait(450);
             }
 
+            setStatus({state: okCount === totalCount ? "ok" : "bad", key: okCount === totalCount ? "boughtOrangeGear" : "failed", params: {}});
             setBusy(false);
         }
 
@@ -783,16 +864,18 @@
                 h(Panel, {title: t("controls")},
                     h("div", {className: "grid gap-4 p-[18px]"},
                         h(Field, {label: t("userId"), htmlFor: "uidInput"},
-                            h("input", {
+                            h("textarea", {
                                 id: "uidInput",
                                 name: "uid",
                                 inputMode: "numeric",
                                 autoComplete: "off",
-                                placeholder: "1556975198000136",
+                                rows: 2,
+                                placeholder: "1010432087000136 1582098058000136",
                                 value: uid,
                                 onChange: event => updateUid(event.target.value),
-                                className: inputClassName,
+                                className: `${inputClassName} min-h-[72px] resize-y py-2 leading-relaxed`,
                             }),
+                            h("p", {className: "text-xs font-bold leading-relaxed text-muted"}, t("userIdHelp")),
                         ),
                         h(Field, {label: t("giftCode"), htmlFor: "giftCodeInput"},
                             h("input", {
@@ -892,6 +975,9 @@
         return h("article", {className: "grid animate-resultIn grid-cols-[28px_minmax(0,1fr)_auto] items-start gap-2.5 rounded-lg border border-line bg-white p-3"},
             h("div", {className: `grid h-[26px] w-[26px] place-items-center rounded-full text-sm font-extrabold text-white ${badgeClass(result.state)}`}, stateIcon(result.state)),
             h("div", null,
+                result.accountLabel
+                    ? h("p", {className: "mb-1 break-words text-[11px] font-extrabold leading-tight text-brand"}, result.accountLabel)
+                    : null,
                 h("p", {className: "m-0 text-sm font-extrabold leading-tight"}, name),
                 h("p", {className: "mt-1 break-words font-mono text-xs leading-relaxed text-muted"}, result.detail),
             ),
