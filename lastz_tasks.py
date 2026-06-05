@@ -14,7 +14,9 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 
 STORE_ORIGIN = "https://store.last-z.com"
@@ -23,6 +25,7 @@ DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
 )
+TAIPEI_TIMEZONE = ZoneInfo("Asia/Taipei")
 
 
 @dataclass(frozen=True)
@@ -33,6 +36,7 @@ class ApiTask:
     referer: str
     payload: dict[str, Any]
     include_login_cookie: bool = False
+    noop: bool = False
 
 
 @dataclass(frozen=True)
@@ -44,24 +48,77 @@ class TaskResult:
     error: str = ""
 
 
-def build_day7_task(uid: str, day: int) -> ApiTask:
+def build_day7_status_task(uid: str) -> ApiTask:
     return ApiTask(
-        name="七日簽到",
-        url=f"{STORE_ORIGIN}/sendday7_new.php",
+        name="取得七日簽到狀態",
+        url=f"{STORE_ORIGIN}/getday7.php",
         origin=WEBSITE_ORIGIN,
         referer=f"{WEBSITE_ORIGIN}/",
-        payload={
-            "uid": uid,
-            "day": day,
-            "dtype": 0,
-            "lang": "hk",
-        },
+        payload={"uid": uid},
     )
 
 
-def build_tasks(uid: str, day: int, vip_level: int) -> list[ApiTask]:
+def build_day7_done_task(uid: str) -> ApiTask:
+    return ApiTask(
+        name="七日簽到：今天簽過了",
+        url=f"{STORE_ORIGIN}/sendday7_new.php",
+        origin=WEBSITE_ORIGIN,
+        referer=f"{WEBSITE_ORIGIN}/",
+        payload={"uid": uid},
+        noop=True,
+    )
+
+
+def build_day7_task(uid: str, day: int, dtype: int = 0) -> ApiTask:
+    payload: dict[str, Any] = {
+        "uid": uid,
+        "day": day,
+        "dtype": dtype,
+        "lang": "hk",
+    }
+    if dtype == 0 and day == 1:
+        payload = {
+            "uid": uid,
+            "fromkoc": "",
+            "day": day,
+            "dtype": 0,
+            "lang": "zh-HK",
+        }
+
+    return ApiTask(
+        name="七日補簽" if dtype == 1 else "七日簽到",
+        url=f"{STORE_ORIGIN}/sendday7_new.php",
+        origin=WEBSITE_ORIGIN,
+        referer=f"{WEBSITE_ORIGIN}/",
+        payload=payload,
+    )
+
+
+def current_taipei_checkin_day() -> int:
+    return datetime.now(TAIPEI_TIMEZONE).weekday() + 1
+
+
+def choose_day7_tasks_from_status(uid: str, text: str) -> list[ApiTask]:
+    data = json.loads(text)
+    rewards = data.get("reward", [])
+    if not isinstance(rewards, list):
+        return []
+
+    tasks: list[ApiTask] = []
+    for reward in rewards:
+        if isinstance(reward, dict) and reward.get("status") == 1:
+            tasks.append(build_day7_task(uid, int(reward["day"]), dtype=0))
+
+    for reward in rewards:
+        if isinstance(reward, dict) and reward.get("status") == 3:
+            tasks.append(build_day7_task(uid, int(reward["day"]), dtype=1))
+
+    return tasks
+
+
+def build_tasks(uid: str, day7_tasks: list[ApiTask], vip_level: int) -> list[ApiTask]:
     return [
-        build_day7_task(uid, day),
+        *day7_tasks,
         ApiTask(
             name="進入積分商城頁面",
             url=f"{STORE_ORIGIN}/getshop.php",
@@ -208,9 +265,7 @@ def parse_args() -> argparse.Namespace:
         description="Input a LastZ user id and call the captured store task APIs."
     )
     parser.add_argument("uid", nargs="?", help="玩家 user id / uid")
-    parser.add_argument("--day", type=int, default=5, help="固定七日簽到 day 值，搭配 --fixed-day 使用；預設 5")
-    parser.add_argument("--auto-day", dest="auto_day", action="store_true", default=True, help="七日簽到從 day 0 試到 6，第一個成功就停止；預設啟用")
-    parser.add_argument("--fixed-day", dest="auto_day", action="store_false", help="停用 auto day，改用 --day 指定的固定 day")
+    parser.add_argument("--day", type=int, help="指定七日簽到 day 值；不指定時會先查 getday7 狀態，依序執行 status 1 和 status 3")
     parser.add_argument("--vip-level", type=int, default=1, help="VIP 等級 vlevel，預設 1")
     parser.add_argument("--delay", type=float, default=0.8, help="每個 API 間隔秒數，預設 0.8")
     parser.add_argument("--timeout", type=float, default=20, help="單次請求逾時秒數，預設 20")
@@ -235,7 +290,7 @@ def require_uid(uid: str | None) -> str:
 def run_tasks_for_uid(
     uid: str,
     *,
-    day: int,
+    day: int | None,
     vip_level: int,
     delay: float,
     timeout: float,
@@ -243,32 +298,30 @@ def run_tasks_for_uid(
     ssl_context: ssl.SSLContext | None,
     dry_run: bool,
     quiet: bool = False,
-    auto_day: bool = False,
 ) -> list[TaskResult]:
-    tasks = build_tasks(uid=uid, day=day, vip_level=vip_level)
+    day7_tasks = resolve_day7_tasks(
+        uid,
+        day=day,
+        user_agent=user_agent,
+        timeout=timeout,
+        ssl_context=ssl_context,
+        dry_run=dry_run,
+        quiet=quiet,
+    )
+    tasks = build_tasks(uid=uid, day7_tasks=day7_tasks, vip_level=vip_level)
     results: list[TaskResult] = []
 
     for index, task in enumerate(tasks, start=1):
-        if auto_day and task.name == "七日簽到":
-            result = run_auto_day_task(
-                uid,
-                index=index,
-                total=len(tasks),
-                user_agent=user_agent,
-                timeout=timeout,
-                ssl_context=ssl_context,
-                dry_run=dry_run,
-                quiet=quiet,
-            )
-            results.append(result)
-            if index < len(tasks) and delay > 0:
-                time.sleep(delay)
-            continue
-
         if not quiet:
             print(f"\n[{index}/{len(tasks)}] {task.name}")
             print(f"POST {task.url}")
             print(json.dumps(task.payload, ensure_ascii=False, indent=2))
+
+        if task.noop:
+            if not quiet:
+                print("今天簽過了，略過簽到 API。")
+            results.append(TaskResult(task_name=task.name, ok=True, response_text="今天簽過了"))
+            continue
 
         if dry_run:
             results.append(TaskResult(task_name=task.name, ok=True))
@@ -306,57 +359,41 @@ def run_tasks_for_uid(
     return results
 
 
-def run_auto_day_task(
+def resolve_day7_tasks(
     uid: str,
     *,
-    index: int,
-    total: int,
+    day: int | None,
     user_agent: str,
     timeout: float,
     ssl_context: ssl.SSLContext | None,
     dry_run: bool,
     quiet: bool,
-) -> TaskResult:
-    task_name = "七日簽到"
-    last_status: int | None = None
-    last_text = ""
-    last_error = ""
-
-    for day in range(7):
-        task = build_day7_task(uid, day)
-        if not quiet:
-            print(f"\n[{index}/{total}] {task.name} auto day {day}")
-            print(f"POST {task.url}")
-            print(json.dumps(task.payload, ensure_ascii=False, indent=2))
-
-        if dry_run:
-            continue
-
-        try:
-            status, text = post_json(uid, task, user_agent, timeout, ssl_context)
-        except urllib.error.HTTPError as exc:
-            text = exc.read().decode("utf-8", errors="replace")
-            last_status = exc.code
-            last_text = text
-            last_error = f"HTTP {exc.code}"
-            if not quiet:
-                print(f"HTTP {exc.code}: {text}", file=sys.stderr)
-        except (urllib.error.URLError, TimeoutError) as exc:
-            last_error = str(exc)
-            if not quiet:
-                print(f"請求失敗：{exc}", file=sys.stderr)
-        else:
-            last_status = status
-            last_text = text
-            if not quiet:
-                print(f"HTTP {status}: {text}")
-            if is_api_success(status, text):
-                return TaskResult(task_name=f"{task_name} day {day}", ok=True, status=status, response_text=text)
+) -> list[ApiTask]:
+    if day is not None:
+        return [build_day7_task(uid, day)]
 
     if dry_run:
-        return TaskResult(task_name=f"{task_name} auto day 0-6", ok=True)
+        return [build_day7_task(uid, current_taipei_checkin_day())]
 
-    return TaskResult(task_name=f"{task_name} auto day 0-6", ok=False, status=last_status, response_text=last_text, error=last_error)
+    status_task = build_day7_status_task(uid)
+    if not quiet:
+        print("\n[0/8] 取得七日簽到狀態")
+        print(f"POST {status_task.url}")
+        print(json.dumps(status_task.payload, ensure_ascii=False, indent=2))
+
+    try:
+        status, text = post_json(uid, status_task, user_agent, timeout, ssl_context)
+        if not quiet:
+            print(f"HTTP {status}: {text}")
+        chosen_tasks = choose_day7_tasks_from_status(uid, text)
+        if chosen_tasks:
+            return chosen_tasks
+        return [build_day7_done_task(uid)]
+    except (json.JSONDecodeError, KeyError, TypeError, urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+        if not quiet:
+            print(f"取得七日簽到狀態失敗：{exc}", file=sys.stderr)
+
+    return [build_day7_task(uid, current_taipei_checkin_day())]
 
 
 def main() -> int:
@@ -380,7 +417,6 @@ def main() -> int:
         ssl_context=ssl_context,
         dry_run=args.dry_run,
         quiet=args.quiet,
-        auto_day=args.auto_day,
     )
 
     return 0 if all(result.ok for result in results) else 1

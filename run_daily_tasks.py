@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from lastz_tasks import DEFAULT_USER_AGENT, build_ssl_context, run_tasks_for_uid
+from lastz_tasks import DEFAULT_USER_AGENT, build_ssl_context, current_taipei_checkin_day, run_tasks_for_uid
 
 
 DEFAULT_ACCOUNTS_FILE = Path(__file__).with_name("accounts.json")
@@ -58,9 +58,7 @@ def parse_account(item: Any) -> Account | None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run LastZ task APIs for configured accounts.")
     parser.add_argument("--accounts", type=Path, default=DEFAULT_ACCOUNTS_FILE, help="帳號設定檔，預設 accounts.json")
-    parser.add_argument("--day", type=int, default=5, help="固定七日簽到 day 值，搭配 --fixed-day 使用；預設 5")
-    parser.add_argument("--auto-day", dest="auto_day", action="store_true", default=True, help="七日簽到從 day 0 試到 6，第一個成功就停止；預設啟用")
-    parser.add_argument("--fixed-day", dest="auto_day", action="store_false", help="停用 auto day，改用 --day 指定的固定 day")
+    parser.add_argument("--day", type=int, help="指定七日簽到 day 值；不指定時會先查 getday7 狀態，依序執行 status 1 和 status 3")
     parser.add_argument("--vip-level", type=int, default=1, help="VIP 等級 vlevel，預設 1")
     parser.add_argument("--task-delay", type=float, default=0.8, help="同一帳號每個 API 間隔秒數，預設 0.8")
     parser.add_argument("--account-delay", type=float, default=2.0, help="每個帳號間隔秒數，預設 2.0")
@@ -96,7 +94,7 @@ def main() -> int:
             print(f"\n========== [{index}/{len(accounts)}] {account.name} ({account.uid}) ==========")
         results = run_tasks_for_uid(
             account.uid,
-            day=args.day,
+            day=args.day if args.day is not None else current_taipei_checkin_day(),
             vip_level=args.vip_level,
             delay=args.task_delay,
             timeout=args.timeout,
@@ -104,7 +102,6 @@ def main() -> int:
             ssl_context=ssl_context,
             dry_run=args.dry_run,
             quiet=args.quiet,
-            auto_day=args.auto_day,
         )
 
         failed = [result.task_name for result in results if not result.ok]

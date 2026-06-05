@@ -123,6 +123,9 @@
             taskRedeemGift: "領取禮物碼",
             taskBuyOrangeGear: "用積分購買橙裝",
             taskLookupUser: "搜尋用戶名稱",
+            taskDay7Status: "取得七日簽到狀態",
+            taskDay7Makeup: "七日補簽",
+            taskDay7Done: "七日簽到",
         },
         en: {
         subtitle: "Website tasks and gift code redemption",
@@ -158,6 +161,9 @@
             taskRedeemGift: "Redeem gift code",
             taskBuyOrangeGear: "Buy orange gear with points",
             taskLookupUser: "Look up user name",
+            taskDay7Status: "Get 7-day check-in status",
+            taskDay7Makeup: "7-day makeup check-in",
+            taskDay7Done: "7-day check-in",
         },
     };
 
@@ -364,7 +370,7 @@
             nameKey: "taskDay7",
             method: "POST",
             url: `${STORE_ORIGIN}/sendday7_new.php`,
-            body: (uid, day = 5) => ({uid, day, dtype: 0, lang: "hk"}),
+            body: buildDay7Payload,
         },
         {
             nameKey: "taskGetShop",
@@ -448,6 +454,24 @@
         return Array.from(new Set(value.split(/[\s,，]+/).map(item => item.trim()).filter(Boolean)));
     }
 
+    function buildDay7Payload(uid, day = 5, dtype = 0) {
+        if (dtype === 0 && day === 1) {
+            return {uid, fromkoc: "", day, dtype: 0, lang: "zh-HK"};
+        }
+        return {uid, day, dtype, lang: "hk"};
+    }
+
+    function chooseDay7Rewards(body) {
+        const rewards = Array.isArray(body && body.reward) ? body.reward : [];
+        const normal = rewards
+            .filter(reward => reward && reward.status === 1)
+            .map(reward => ({day: Number(reward.day), dtype: 0}));
+        const makeup = rewards
+            .filter(reward => reward && reward.status === 3)
+            .map(reward => ({day: Number(reward.day), dtype: 1}));
+        return [...normal, ...makeup];
+    }
+
     async function readResponse(response) {
         const text = await response.text();
         let body = text;
@@ -502,6 +526,8 @@
         if (code === 0) {
             const successMessages = {
                 taskDay7: {zh: "簽到完成！", en: "Check-in complete!"},
+                taskDay7Done: {zh: "今天簽過了", en: "Already checked in today."},
+                taskDay7Makeup: {zh: "補簽完成！", en: "Makeup check-in complete!"},
                 taskLogin: {zh: "登入完成！", en: "Login task complete!"},
                 taskViewUcenter: {zh: "會員中心逛完了！", en: "Member center visited!"},
                 taskViewShop: {zh: "商城逛完了！", en: "Shop visited!"},
@@ -515,9 +541,11 @@
         if (taskKey === "taskRedeemGift" && result.body.errorCode === "ok") return translatedLine(language, {zh: "領取完成！", en: "Claim complete!"});
         if (taskKey === "taskRedeemGift" && result.body.errorCode === "E006" && message === "code already exchanged") return translatedLine(language, {zh: "領過了啦！", en: "Already claimed!"});
         if (taskKey === "taskLookupUser" && code === 10018 && message === "get user fail") return translatedLine(language, {zh: "你沒有名字...", en: "You have no name..."});
+        if (taskKey === "taskDay7Status" && Array.isArray(result.body.reward)) return translatedLine(language, {zh: "狀態取得完成！", en: "Status loaded!"});
         if (code === 10018 && message === "task forever sql fail") return translatedLine(language, {zh: "今天已經領過惹！", en: "Already claimed today!"});
-        if (taskKey === "taskDay7" && code === 10002001 && message === "send day fail") return translatedLine(language, {zh: "今天已經簽到惹", en: "Already checked in today!"});
-        if (taskKey === "taskDay7" && code === 10002040 && message === "task forever insert fail") return translatedLine(language, {zh: "簽過了啦！", en: "Already checked in!"});
+        if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002001 && message === "send day fail") return translatedLine(language, {zh: "不是現在該簽的日子", en: "This is not the day to check in."});
+        if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002040 && message === "task forever insert fail") return translatedLine(language, {zh: "今天已經簽過這天了", en: "You already checked in for this day."});
+        if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002001 && message === "day fail") return translatedLine(language, {zh: "這是明天，所以基本上不該出現！", en: "This is tomorrow, so this basically should not appear!"});
         if (taskKey === "taskBuy1000" && code === 10002038 && message === "get task type buy1000 fail") return translatedLine(language, {zh: "你今天還沒買夠！", en: "You have not bought enough today!"});
         if (taskKey === "taskFirst2000" && code === 10002038 && message === "get task type first2000 fail") return translatedLine(language, {zh: "魔法小卡拿出來！", en: "Time to bring out the magic card!"});
         if (taskKey === "taskVipWeek" && code === 10002001 && message === "vip level fail") return translatedLine(language, {zh: "VIP 等級錯誤！", en: "VIP level is incorrect!"});
@@ -651,22 +679,92 @@
         }
 
         async function runTaskForAccount(account, task, id) {
-            if (task.nameKey !== "taskDay7") {
-                const response = await postJson(account.uid, task.url, task.body(account.uid));
-                return {response, ok: isSuccessBody(response.body)};
+            const response = await postJson(account.uid, task.url, task.body(account.uid));
+            return {response, ok: isSuccessBody(response.body)};
+        }
+
+        async function runDay7TasksForAccount(account) {
+            let okCount = 0;
+            let totalCount = 1;
+            const statusId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-day7-status`;
+            setResults(previous => [...previous, {
+                id: statusId,
+                accountLabel: accountLabel(account),
+                nameKey: "taskDay7Status",
+                method: "POST",
+                state: "running",
+                detail: t("waiting"),
+            }]);
+
+            let choices = [];
+            try {
+                const response = await postJson(account.uid, `${STORE_ORIGIN}/getday7.php`, {uid: account.uid});
+                const ok = Array.isArray(response.body && response.body.reward);
+            if (ok) {
+                okCount += 1;
+                choices = chooseDay7Rewards(response.body);
+            }
+                setResults(previous => previous.map(result => (
+                    result.id === statusId
+                        ? {...result, state: ok ? "ok" : "bad", response}
+                        : result
+                )));
+            } catch (error) {
+                setResults(previous => previous.map(result => (
+                    result.id === statusId ? {...result, state: "bad", error: error.message} : result
+                )));
+                return {okCount, totalCount};
             }
 
-            let lastResponse = null;
-            for (let day = 0; day <= 6; day += 1) {
-                setResults(previous => previous.map(result => (
-                    result.id === id ? {...result, detail: `day ${day}`} : result
-                )));
-                const response = await postJson(account.uid, task.url, task.body(account.uid, day));
-                lastResponse = response;
-                if (isSuccessBody(response.body)) return {response, ok: true};
-                await wait(250);
+            if (choices.length === 0) {
+                const doneId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-day7-done`;
+                totalCount += 1;
+                okCount += 1;
+                setResults(previous => [...previous, {
+                    id: doneId,
+                    accountLabel: accountLabel(account),
+                    nameKey: "taskDay7Done",
+                    method: "POST",
+                    state: "ok",
+                    response: {status: 200, body: {code: 0}},
+                }]);
             }
-            return {response: lastResponse, ok: false};
+
+            for (const choice of choices) {
+                totalCount += 1;
+                const resultId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-day7-${choice.day}-${choice.dtype}`;
+                const nameKey = choice.dtype === 1 ? "taskDay7Makeup" : "taskDay7";
+                setResults(previous => [...previous, {
+                    id: resultId,
+                    accountLabel: accountLabel(account),
+                    nameKey,
+                    method: "POST",
+                    state: "running",
+                    detail: `day ${choice.day}`,
+                }]);
+
+                try {
+                    const response = await postJson(account.uid, `${STORE_ORIGIN}/sendday7_new.php`, buildDay7Payload(account.uid, choice.day, choice.dtype));
+                    const ok = isSuccessBody(response.body);
+                    if (ok) {
+                        okCount += 1;
+                        celebrate();
+                    }
+                    setResults(previous => previous.map(result => (
+                        result.id === resultId
+                            ? {...result, state: ok ? "ok" : "bad", response}
+                            : result
+                    )));
+                } catch (error) {
+                    setResults(previous => previous.map(result => (
+                        result.id === resultId ? {...result, state: "bad", error: error.message} : result
+                    )));
+                }
+
+                await wait(450);
+            }
+
+            return {okCount, totalCount};
         }
 
         function accountLabel(account) {
@@ -733,12 +831,22 @@
             revealResults();
 
             let okCount = 0;
-            const totalCount = userIds.length * (taskDefinitions.length + 1);
+            let totalCount = 0;
             for (const userId of userIds) {
                 const account = await lookupAccount(userId);
+                totalCount += 1;
                 if (account.lookupOk) okCount += 1;
 
                 for (const task of taskDefinitions) {
+                    if (task.nameKey === "taskDay7") {
+                        const day7Result = await runDay7TasksForAccount(account);
+                        okCount += day7Result.okCount;
+                        totalCount += day7Result.totalCount;
+                        await wait(450);
+                        continue;
+                    }
+
+                    totalCount += 1;
                     const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-${task.nameKey}`;
                     const pendingResult = {
                         id,

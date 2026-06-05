@@ -162,11 +162,11 @@ Optional arguments:
 python3 lastz_tasks.py 1556975198000136 --vip-level 1 --delay 1.2
 ```
 
-The check-in task auto-detects day 0 to 6 by default and stops after the first success. To force a fixed day:
+The check-in task first calls `getday7.php` by default. It runs all rewards with `status: 1` first, then runs rewards with `status: 3` as makeup check-ins. To override the day manually:
 
 ```bash
-python3 lastz_tasks.py 1556975198000136 --fixed-day --day 5 --insecure
-python3 run_daily_tasks.py --fixed-day --day 5 --insecure
+python3 lastz_tasks.py 1556975198000136 --day 5 --insecure
+python3 run_daily_tasks.py --day 5 --insecure
 ```
 
 ### Gift Codes
@@ -414,11 +414,11 @@ python3 lastz_tasks.py
 python3 lastz_tasks.py 1556975198000136 --vip-level 1 --delay 1.2
 ```
 
-七日簽到預設會自動從 day 0 試到 6，第一個成功就停止。如果要強制固定 day：
+七日簽到預設會先呼叫 `getday7.php` 取得狀態；會先執行所有 `status: 1`，再執行 `status: 3` 作為補簽。如果要手動覆蓋 day：
 
 ```bash
-python3 lastz_tasks.py 1556975198000136 --fixed-day --day 5 --insecure
-python3 run_daily_tasks.py --fixed-day --day 5 --insecure
+python3 lastz_tasks.py 1556975198000136 --day 5 --insecure
+python3 run_daily_tasks.py --day 5 --insecure
 ```
 
 ### 兌換不定期禮包碼
