@@ -498,7 +498,7 @@ sed "s#__IMAGE__#$IMAGE#g" k8s/cronjob.yaml | kubectl apply -f -
 
 ```bash
 kubectl create job --from=cronjob/last-daily-tasks last-daily-tasks-manual
-kubectl logs job/last-daily-tasks-manual
+kubectl patch job last-daily-tasks-manual -p '{"spec":{"ttlSecondsAfterFinished":300}}'
 ```
 
 CronJob 預設帶 `--quiet`，所以正常情況下 `kubectl logs` 不會有輸出；請用 Job/Pod 狀態確認是否完成。
