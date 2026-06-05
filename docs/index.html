@@ -76,7 +76,7 @@
 
     const translations = {
         zh: {
-            subtitle: "官網任務與禮物碼領取",
+        subtitle: "官網任務與禮物碼領取",
             controls: "操作",
             userId: "User ID",
             giftCode: "禮物碼",
@@ -84,10 +84,10 @@
             redeemGift: "領取禮物碼",
             buyOrangeGear: "用積分購買橙裝",
             results: "結果",
-            noResults: "尚無結果",
-            ready: "就緒",
-            missingInput: "缺少輸入",
-            missingUserId: "缺少 user id",
+        noResults: "看什麼看？快點按按鈕！",
+        ready: "喵喵喵",
+            missingInput: "請輸入禮物碼",
+            missingUserId: "請輸入 User ID",
             runningTasks: "執行任務中",
             redeeming: "領取中",
             redeemed: "已領取",
@@ -109,7 +109,7 @@
             taskBuyOrangeGear: "用積分購買橙裝",
         },
         en: {
-            subtitle: "Website tasks and gift code redemption",
+        subtitle: "Website tasks and gift code redemption",
             controls: "Controls",
             userId: "User ID",
             giftCode: "Gift Code",
@@ -117,10 +117,10 @@
             redeemGift: "Redeem Gift Code",
             buyOrangeGear: "Buy Orange Gear with Points",
             results: "Results",
-            noResults: "No results yet",
-            ready: "Ready",
-            missingInput: "Missing input",
-            missingUserId: "Missing user id",
+        noResults: "What are you looking at? Press a button!",
+        ready: "Meow meow meow",
+            missingInput: "Please enter a gift code",
+            missingUserId: "Please enter a User ID",
             runningTasks: "Running tasks",
             redeeming: "Redeeming",
             redeemed: "Redeemed",
@@ -246,6 +246,101 @@
         },
     ];
 
+    const validationLines = [
+        {
+            zh: "欸嘿，有東西還沒填完哦",
+            en: "Oops, something's still missing.",
+        },
+        {
+            zh: "漂亮歸漂亮，資料還是要填啦",
+            en: "Beauty aside, the form still needs filling.",
+        },
+        {
+            zh: "我知道你很急，但先填完嘛",
+            en: "I know you're excited, but finish the form first.",
+        },
+        {
+            zh: "再檢查一下下，好嗎？",
+            en: "One tiny check before we continue?",
+        },
+        {
+            zh: "有空格沒填，我都看到了",
+            en: "I noticed some empty fields.",
+        },
+        {
+            zh: "按按鈕之前，要先照顧好我呀",
+            en: "Take care of the form before pressing buttons.",
+        },
+        {
+            zh: "資料不完整，我會小小鬧脾氣",
+            en: "Incomplete data detected. Tiny tantrum activated.",
+        },
+        {
+            zh: "這樣直接送出，我會有點困擾",
+            en: "Submitting like this feels a little dangerous.",
+        },
+        {
+            zh: "還差一點點，就差一點點",
+            en: "Almost there. Just a tiny bit more.",
+        },
+        {
+            zh: "你是不是漏掉了什麼呀？",
+            en: "Did you forget something?",
+        },
+        {
+            zh: "先填資料，再來耍可愛",
+            en: "Complete the form, then continue being cute.",
+        },
+        {
+            zh: "不可以偷跑哦",
+            en: "No speedrunning allowed.",
+        },
+        {
+            zh: "我努力幫你，但你也要努力填呀",
+            en: "I'm helping you here. Help me a little too.",
+        },
+        {
+            zh: "這份資料看起來有點孤單",
+            en: "This form feels a little empty.",
+        },
+        {
+            zh: "現在送出，等等可能會哭哭哦",
+            en: "Submitting now may cause future regrets.",
+        },
+        {
+            zh: "漂亮姐姐幫你抓到了漏填欄位",
+            en: "A pretty assistant found missing fields.",
+        },
+        {
+            zh: "這樣不行啦，我會卡住",
+            en: "I can't continue like this.",
+        },
+        {
+            zh: "有些欄位正在等你回頭看看",
+            en: "Some fields are waiting for your attention.",
+        },
+        {
+            zh: "先別急著按，我還沒準備好",
+            en: "Wait a second. I'm not ready yet.",
+        },
+        {
+            zh: "資料不完整的話，魔法不會發動",
+            en: "Magic only works with complete forms.",
+        },
+        {
+            zh: "我知道你很可愛，但必填欄位更重要",
+            en: "You're cute, but required fields matter more.",
+        },
+        {
+            zh: "這個按鈕不是許願池啦",
+            en: "This button isn't a wishing well.",
+        },
+        {
+            zh: "再補一下資料，我就幫你完成",
+            en: "Fill in the rest and I'll handle the magic.",
+        },
+    ];
+
     const taskDefinitions = [
         {
             nameKey: "taskDay7",
@@ -325,6 +420,10 @@
 
     function randomCuteLineIndex() {
         return Math.floor(Math.random() * cuteLines.length);
+    }
+
+    function randomValidationLineIndex() {
+        return Math.floor(Math.random() * validationLines.length);
     }
 
     async function readResponse(response) {
@@ -407,6 +506,7 @@
         const [busy, setBusy] = useState(false);
         const [status, setStatus] = useState({state: "idle", key: "ready", params: {}});
         const [cuteLineIndex] = useState(randomCuteLineIndex);
+        const [validationLineIndex, setValidationLineIndex] = useState(null);
         const resultsPanelRef = useRef(null);
         const resultsListRef = useRef(null);
         const resultsEndRef = useRef(null);
@@ -459,10 +559,18 @@
             const cleanUid = uid.trim();
             if (!cleanUid) {
                 setStatus({state: "bad", key: "missingUserId", params: {}});
+                showValidationMessage();
                 return "";
             }
             localStorage.setItem(USER_STORAGE_KEY, cleanUid);
             return cleanUid;
+        }
+
+        function showValidationMessage() {
+            setResults([]);
+            setValidationLineIndex(randomValidationLineIndex());
+            previousResultCountRef.current = 0;
+            revealResults();
         }
 
         function revealResults() {
@@ -477,6 +585,7 @@
 
             setBusy(true);
             setResults([]);
+            setValidationLineIndex(null);
             previousResultCountRef.current = 0;
             setStatus({state: "running", key: "runningTasks", params: {}});
             revealResults();
@@ -527,13 +636,16 @@
         async function redeemGiftCode() {
             const cleanUid = requireUid();
             const cleanCode = giftCode.trim();
-            if (!cleanUid || !cleanCode) {
+            if (!cleanUid) return;
+            if (!cleanCode) {
                 setStatus({state: "bad", key: "missingInput", params: {}});
+                showValidationMessage();
                 return;
             }
 
             setBusy(true);
             setResults([]);
+            setValidationLineIndex(null);
             previousResultCountRef.current = 0;
             setStatus({state: "running", key: "redeeming", params: {}});
             revealResults();
@@ -577,6 +689,7 @@
 
             setBusy(true);
             setResults([]);
+            setValidationLineIndex(null);
             previousResultCountRef.current = 0;
             setStatus({state: "running", key: "buyingOrangeGear", params: {}});
             revealResults();
@@ -706,7 +819,11 @@
                                 className: "grid auto-rows-max content-start gap-2 p-[18px] md:max-h-[calc(100vh-180px)] md:min-h-[360px] md:overflow-auto",
                             },
                             results.length === 0
-                                ? h(EmptyState, {label: t("noResults")})
+                                ? h(EmptyState, {
+                                    label: validationLineIndex === null
+                                        ? t("noResults")
+                                        : validationLines[validationLineIndex][language],
+                                })
                                 : results.map(result => h(ResultItem, {
                                     key: result.id,
                                     result,
