@@ -58,7 +58,7 @@ def parse_account(item: Any) -> Account | None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run LastZ task APIs for configured accounts.")
     parser.add_argument("--accounts", type=Path, default=DEFAULT_ACCOUNTS_FILE, help="帳號設定檔，預設 accounts.json")
-    parser.add_argument("--day", type=int, help="指定七日簽到 day 值；不指定時會先查 getday7 狀態，依序執行 status 1 和 status 3")
+    parser.add_argument("--day", type=int, help="指定七日簽到 day 值；不指定時會先查 getday7 狀態，依序執行 status -1 和 status 3")
     parser.add_argument("--vip-level", type=int, default=1, help="VIP 等級 vlevel，預設 1")
     parser.add_argument("--task-delay", type=float, default=0.8, help="同一帳號每個 API 間隔秒數，預設 0.8")
     parser.add_argument("--account-delay", type=float, default=2.0, help="每個帳號間隔秒數，預設 2.0")

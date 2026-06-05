@@ -162,7 +162,7 @@ Optional arguments:
 python3 lastz_tasks.py 1556975198000136 --vip-level 1 --delay 1.2
 ```
 
-The check-in task first calls `getday7.php` by default. It runs all rewards with `status: 1` first, then runs rewards with `status: 3` as makeup check-ins. To override the day manually:
+The check-in task first calls `getday7.php` by default. It runs all rewards with `status: -1` first, then runs rewards with `status: 3` as makeup check-ins. To override the day manually:
 
 ```bash
 python3 lastz_tasks.py 1556975198000136 --day 5 --insecure
@@ -414,7 +414,7 @@ python3 lastz_tasks.py
 python3 lastz_tasks.py 1556975198000136 --vip-level 1 --delay 1.2
 ```
 
-七日簽到預設會先呼叫 `getday7.php` 取得狀態；會先執行所有 `status: 1`，再執行 `status: 3` 作為補簽。如果要手動覆蓋 day：
+七日簽到預設會先呼叫 `getday7.php` 取得狀態；會先執行所有 `status: -1`，再執行 `status: 3` 作為補簽。如果要手動覆蓋 day：
 
 ```bash
 python3 lastz_tasks.py 1556975198000136 --day 5 --insecure

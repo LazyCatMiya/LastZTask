@@ -106,7 +106,7 @@ def choose_day7_tasks_from_status(uid: str, text: str) -> list[ApiTask]:
 
     tasks: list[ApiTask] = []
     for reward in rewards:
-        if isinstance(reward, dict) and reward.get("status") == 1:
+        if isinstance(reward, dict) and reward.get("status") == -1:
             tasks.append(build_day7_task(uid, int(reward["day"]), dtype=0))
 
     for reward in rewards:
@@ -265,7 +265,7 @@ def parse_args() -> argparse.Namespace:
         description="Input a LastZ user id and call the captured store task APIs."
     )
     parser.add_argument("uid", nargs="?", help="玩家 user id / uid")
-    parser.add_argument("--day", type=int, help="指定七日簽到 day 值；不指定時會先查 getday7 狀態，依序執行 status 1 和 status 3")
+    parser.add_argument("--day", type=int, help="指定七日簽到 day 值；不指定時會先查 getday7 狀態，依序執行 status -1 和 status 3")
     parser.add_argument("--vip-level", type=int, default=1, help="VIP 等級 vlevel，預設 1")
     parser.add_argument("--delay", type=float, default=0.8, help="每個 API 間隔秒數，預設 0.8")
     parser.add_argument("--timeout", type=float, default=20, help="單次請求逾時秒數，預設 20")

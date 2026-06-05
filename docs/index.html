@@ -473,7 +473,7 @@
     function chooseDay7Rewards(body) {
         const rewards = Array.isArray(body && body.reward) ? body.reward : [];
         const normal = rewards
-            .filter(reward => reward && reward.status === 1)
+            .filter(reward => reward && reward.status === -1)
             .map(reward => ({day: Number(reward.day), dtype: 0}));
         const makeup = rewards
             .filter(reward => reward && reward.status === 3)
@@ -746,7 +746,7 @@
                     nameKey: "taskDay7Done",
                     method: "POST",
                     state: "ok",
-                    response: {status: 200, body: {code: 0, message: "no status 1 or 3"}},
+                    response: {status: 200, body: {code: 0, message: "no status -1 or 3"}},
                 }]);
             }
 
