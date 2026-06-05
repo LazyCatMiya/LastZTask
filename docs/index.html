@@ -114,11 +114,11 @@
             itemCount: "{count} 筆",
             taskDay7: "七日簽到",
             taskGetShop: "進入積分商城頁面",
-            taskLogin: "完成任務：登入",
-            taskViewUcenter: "完成任務：瀏覽會員中心頁面",
-            taskViewShop: "完成任務：瀏覽積分商城頁面",
-            taskBuy1000: "每日購買任意禮包或購買金碼數量達到 1000",
-            taskFirst2000: "首次購買金磚數量達到 2000",
+            taskLogin: "任務：登入",
+            taskViewUcenter: "任務：瀏覽會員中心頁面",
+            taskViewShop: "任務：瀏覽積分商城頁面",
+            taskBuy1000: "任務：購買任意禮包或金磚 > 1000",
+            taskFirst2000: "任務：首次購買金磚 > 2000",
             taskVipWeek: "領取每週特權禮包",
             taskRedeemGift: "領取禮物碼",
             taskBuyOrangeGear: "用積分購買橙裝",
@@ -149,11 +149,11 @@
             itemCount: "{count} items",
             taskDay7: "7-day check-in",
             taskGetShop: "Open points shop page",
-            taskLogin: "Complete task: login",
-            taskViewUcenter: "Complete task: view member center",
-            taskViewShop: "Complete task: view points shop",
-            taskBuy1000: "Daily package purchase or 1000 gold code purchase",
-            taskFirst2000: "First 2000 gold brick purchase",
+            taskLogin: "Task: login",
+            taskViewUcenter: "Task: view member center",
+            taskViewShop: "Task: view points shop",
+            taskBuy1000: "Task: buy any package or gold bricks > 1000",
+            taskFirst2000: "Task: first gold bricks purchase > 2000",
             taskVipWeek: "Claim weekly VIP package",
             taskRedeemGift: "Redeem gift code",
             taskBuyOrangeGear: "Buy orange gear with points",
@@ -490,7 +490,42 @@
         return false;
     }
 
-    function formatResponse(result) {
+    function friendlyResponseMessage(result, taskKey) {
+        if (!result.body || typeof result.body !== "object") return "";
+
+        const code = result.body.code;
+        const message = result.body.message;
+        if (code === 0) {
+            const successMessages = {
+                taskDay7: "簽到完成！",
+                taskLogin: "登入完成！",
+                taskViewUcenter: "會員中心逛完了！",
+                taskViewShop: "商城逛完了！",
+                taskBuy1000: "買夠了，任務完成！",
+                taskFirst2000: "首次 2000 任務完成！",
+                taskVipWeek: "每週禮包領到惹！",
+                taskBuyOrangeGear: "橙裝買到惹！",
+            };
+            if (successMessages[taskKey]) return successMessages[taskKey];
+        }
+        if (taskKey === "taskRedeemGift" && result.body.errorCode === "ok") return "禮物碼領到惹！";
+        if (taskKey === "taskLookupUser" && code === 10018 && message === "get user fail") return "你沒有名字...";
+        if (code === 10018 && message === "task forever sql fail") return "今天已經領過惹";
+        if (taskKey === "taskDay7" && code === 10002001 && message === "send day fail") return "今天已經簽到惹";
+        if (taskKey === "taskBuy1000" && code === 10002038 && message === "get task type buy1000 fail") return "你今天還沒買夠";
+        if (taskKey === "taskFirst2000" && code === 10002038 && message === "get task type first2000 fail") return "魔法小卡拿出來！";
+        if (taskKey === "taskVipWeek" && code === 10002001 && message === "vip level fail") return "VIP 等級錯誤";
+        return "";
+    }
+
+    function formatResponse(result, taskKey = "") {
+        const friendlyMessage = friendlyResponseMessage(result, taskKey);
+        if (friendlyMessage) return friendlyMessage;
+
+        if (taskKey === "taskGetShop" && result.body && typeof result.body === "object" && Array.isArray(result.body.shopConfig)) {
+            return "我進來了！";
+        }
+
         if (result.body && typeof result.body === "object" && Array.isArray(result.body.shopConfig)) {
             const parts = [`shopConfig: ${result.body.shopConfig.length} items`];
             if (result.body.lid !== undefined) parts.push(`lid: ${result.body.lid}`);
@@ -637,7 +672,7 @@
                             ...result,
                             accountLabel: accountLabel(account),
                             state: ok ? "ok" : "bad",
-                            detail: ok ? accountFullLabel(account) : formatResponse(response),
+                            detail: ok ? accountFullLabel(account) : formatResponse(response, "taskLookupUser"),
                         }
                         : result
                 )));
@@ -690,7 +725,7 @@
                         }
                         setResults(previous => previous.map(result => (
                             result.id === id
-                                ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response)}
+                                ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response, task.nameKey)}
                                 : result
                         )));
                     } catch (error) {
@@ -759,7 +794,7 @@
                     }
                     setResults(previous => previous.map(result => (
                         result.id === id
-                            ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response)}
+                            ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response, "taskRedeemGift")}
                             : result
                     )));
                 } catch (error) {
@@ -812,7 +847,7 @@
                     }
                     setResults(previous => previous.map(result => (
                         result.id === id
-                            ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response)}
+                            ? {...result, state: ok ? "ok" : "bad", detail: formatResponse(response, task.nameKey)}
                             : result
                     )));
                 } catch (error) {
