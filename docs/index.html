@@ -87,6 +87,7 @@
     const GIFT_ORIGIN = "https://giftcenter.last-z.com";
     const USER_STORAGE_KEY = "lastz:user-id";
     const LANGUAGE_STORAGE_KEY = "lastz:language";
+    const HUMAN_RESPONSE_STORAGE_KEY = "lastz:human-response";
 
     const translations = {
         zh: {
@@ -99,6 +100,7 @@
             redeemGift: "領取禮物碼",
             buyOrangeGear: "用積分購買橙裝",
             results: "結果",
+            humanResponse: "說人話",
         noResults: "看什麼看？快點按按鈕！",
         ready: "喵喵喵",
             missingInput: "請輸入禮物碼",
@@ -137,6 +139,7 @@
             redeemGift: "Redeem Gift Code",
             buyOrangeGear: "Buy Orange Gear with Points",
             results: "Results",
+            humanResponse: "Human-readable",
         noResults: "What are you looking at? Press a button!",
         ready: "Meow meow meow",
             missingInput: "Please enter a gift code",
@@ -438,6 +441,12 @@
         return navigator.language && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
     }
 
+    function getInitialHumanResponse() {
+        const saved = localStorage.getItem(HUMAN_RESPONSE_STORAGE_KEY);
+        if (saved === "false") return false;
+        return true;
+    }
+
     function wait(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -526,7 +535,7 @@
         if (code === 0) {
             const successMessages = {
                 taskDay7: {zh: "簽到完成！", en: "Check-in complete!"},
-                taskDay7Done: {zh: "今天簽過了", en: "Already checked in today."},
+                taskDay7Done: {zh: "今天簽過了！", en: "Already checked in today!"},
                 taskDay7Makeup: {zh: "補簽完成！", en: "Makeup check-in complete!"},
                 taskLogin: {zh: "登入完成！", en: "Login task complete!"},
                 taskViewUcenter: {zh: "會員中心逛完了！", en: "Member center visited!"},
@@ -553,7 +562,14 @@
         return "";
     }
 
-    function formatResponse(result, taskKey = "", language = "zh") {
+    function rawResponseText(result) {
+        const body = typeof result.body === "string" ? result.body : JSON.stringify(result.body);
+        return `HTTP ${result.status} ${body}`;
+    }
+
+    function formatResponse(result, taskKey = "", language = "zh", humanResponse = true) {
+        if (!humanResponse) return rawResponseText(result);
+
         const friendlyMessage = friendlyResponseMessage(result, taskKey, language);
         if (friendlyMessage) return friendlyMessage;
 
@@ -568,8 +584,7 @@
             return `HTTP ${result.status} ${parts.join(", ")}`;
         }
 
-        const body = typeof result.body === "string" ? result.body : JSON.stringify(result.body);
-        return `HTTP ${result.status} ${body}`;
+        return rawResponseText(result);
     }
 
     function Icon({icon, className = "h-[18px] w-[18px]"}) {
@@ -592,6 +607,7 @@
 
     function App() {
         const [language, setLanguageState] = useState(getInitialLanguage);
+        const [humanResponse, setHumanResponse] = useState(getInitialHumanResponse);
         const [uid, setUid] = useState(() => localStorage.getItem(USER_STORAGE_KEY) || "");
         const [giftCode, setGiftCode] = useState("");
         const [results, setResults] = useState([]);
@@ -615,6 +631,10 @@
             document.documentElement.lang = language === "zh" ? "zh-Hant" : "en";
             localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
         }, [language]);
+
+        useEffect(() => {
+            localStorage.setItem(HUMAN_RESPONSE_STORAGE_KEY, humanResponse ? "true" : "false");
+        }, [humanResponse]);
 
         useEffect(() => {
             if (!busy || results.length <= previousResultCountRef.current) {
@@ -674,7 +694,7 @@
         function resultDetail(result) {
             if (result.state === "running") return result.detail || t("waiting");
             if (result.error) return result.error;
-            if (result.response) return formatResponse(result.response, result.nameKey, language);
+            if (result.response) return formatResponse(result.response, result.nameKey, language, humanResponse);
             return result.detail || "";
         }
 
@@ -726,7 +746,7 @@
                     nameKey: "taskDay7Done",
                     method: "POST",
                     state: "ok",
-                    response: {status: 200, body: {code: 0}},
+                    response: {status: 200, body: {code: 0, message: "no status 1 or 3"}},
                 }]);
             }
 
@@ -1100,7 +1120,15 @@
                     ),
                 ),
                 h("div", {ref: resultsPanelRef},
-                    h(Panel, {title: t("results"), meta: t("itemCount", {count: results.length})},
+                    h(Panel, {
+                            title: t("results"),
+                            meta: t("itemCount", {count: results.length}),
+                            actions: h(HumanResponseToggle, {
+                                label: t("humanResponse"),
+                                checked: humanResponse,
+                                onChange: setHumanResponse,
+                            }),
+                        },
                         h("div", {
                                 ref: resultsListRef,
                                 className: "grid auto-rows-max content-start gap-2 p-[18px] md:max-h-[calc(100vh-180px)] md:min-h-[360px] md:overflow-auto",
@@ -1129,13 +1157,28 @@
     const primaryButtonClassName = "inline-flex min-h-[46px] items-center justify-center gap-2 rounded-md bg-brand px-4 font-extrabold text-white transition hover:-translate-y-0.5 hover:bg-brand/95 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0";
     const secondaryButtonClassName = "inline-flex min-h-[46px] items-center justify-center gap-2 rounded-md border border-brand/35 bg-brandSoft px-4 font-extrabold text-brand transition hover:-translate-y-0.5 hover:bg-brandSoft/75 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0";
 
-    function Panel({title, meta, children}) {
+    function Panel({title, meta, actions, children}) {
         return h("div", {className: "overflow-hidden rounded-lg border border-line bg-white/70 shadow-soft"},
-            h("div", {className: "flex items-center justify-between gap-3 border-b border-line bg-panelSoft px-[18px] py-4"},
+            h("div", {className: "flex flex-wrap items-center justify-between gap-3 border-b border-line bg-panelSoft px-[18px] py-4"},
                 h("h2", {className: "m-0 text-base font-extrabold leading-tight tracking-normal"}, title),
-                meta ? h("span", {className: "text-xs font-extrabold text-muted"}, meta) : null,
+                h("div", {className: "flex flex-wrap items-center justify-end gap-3"},
+                    meta ? h("span", {className: "text-xs font-extrabold text-muted"}, meta) : null,
+                    actions || null,
+                ),
             ),
             children,
+        );
+    }
+
+    function HumanResponseToggle({label, checked, onChange}) {
+        return h("label", {className: "inline-flex cursor-pointer items-center gap-2 rounded-full border border-brand/25 bg-white px-2.5 py-1 text-xs font-extrabold text-brand shadow-sm"},
+            h("input", {
+                type: "checkbox",
+                checked,
+                onChange: event => onChange(event.target.checked),
+                className: "h-4 w-4 accent-brand",
+            }),
+            h("span", null, label),
         );
     }
 
