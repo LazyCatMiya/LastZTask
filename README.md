@@ -1,12 +1,40 @@
 <p align="center">
-  <img src="docs/image.png" alt="LastZ Task Runner logo" width="96">
+  <img src="docs/image.png" alt="LastZ Task Runner logo" width="112">
 </p>
 
-# LastZ Task API Script
+<h1 align="center">LastZ Task Runner</h1>
 
-<p>
+<p align="center">
+  A lightweight LastZ task helper with a cute GitHub Pages UI, batch scripts, gift-code redemption, and GKE CronJob deployment.
+</p>
+
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-F1C9A5?style=flat-square&logo=python&logoColor=26312f">
+  <img alt="GitHub Pages" src="https://img.shields.io/badge/GitHub%20Pages-ready-E6F0EC?style=flat-square&logo=githubpages&logoColor=277A6A">
+  <img alt="GKE CronJob" src="https://img.shields.io/badge/GKE-CronJob-D7D4F7?style=flat-square&logo=googlecloud&logoColor=26312f">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-linux%2Famd64-F6D6DF?style=flat-square&logo=docker&logoColor=26312f">
+</p>
+
+<p align="center">
+  <a href="#documentation"><strong>Documentation</strong></a>
+  ·
+  <a href="#github-pages"><strong>GitHub Pages</strong></a>
+  ·
+  <a href="#gke-cronjob"><strong>GKE CronJob</strong></a>
+  ·
   <a href="#zh-docs"><strong>中文文檔</strong></a>
 </p>
+
+---
+
+## Overview
+
+| Surface | What it does |
+| --- | --- |
+| GitHub Pages | Runs website tasks for one user ID, redeems one gift code, and supports manual shop actions. |
+| Python scripts | Runs one account, all configured accounts, gift-code redemption, or manual orange-gear purchase. |
+| GKE CronJob | Runs the daily task batch at 09:30 and 10:30 Asia/Taipei time. |
+| Local storage | Stores the entered GitHub Pages user ID in the browser only. |
 
 ## Documentation
 
@@ -27,6 +55,22 @@ Manual-only actions are kept outside the daily CronJob:
 
 - Redeem occasional gift codes: `code.php`
 - Buy orange gear with points: `sendshop.php`
+
+### Quick Commands
+
+```bash
+# Preview the daily batch without calling APIs
+python3 run_daily_tasks.py --dry-run
+
+# Run all configured accounts
+python3 run_daily_tasks.py --insecure
+
+# Redeem one gift code for all accounts
+python3 redeem_gift_code.py CELEBRATE300K --insecure
+
+# Manually buy orange gear with points
+python3 buy_orange_gear.py 1300112265000136 --insecure
+```
 
 ### GitHub Pages
 
@@ -231,6 +275,15 @@ GKE is useful when you want the job to run independently from a local machine.
 
 <h2 id="zh-docs">中文文檔</h2>
 
+## 專案概覽
+
+| 介面 | 用途 |
+| --- | --- |
+| GitHub Pages | 輸入單一 User ID 後執行官網任務、領取禮物碼、手動執行商城操作。 |
+| Python 腳本 | 可執行單一帳號、固定帳號名單、禮物碼兌換、手動橙裝購買。 |
+| GKE CronJob | 每天台北時間 09:30 和 10:30 自動跑固定名單。 |
+| Local storage | GitHub Pages 只會把輸入的 User ID 存在瀏覽器本機。 |
+
 本專案會依序呼叫抓包得到的 LastZ store API，可用於單一玩家 id 或固定名單：
 
 - 七日簽到：`sendday7_new.php`
@@ -248,6 +301,22 @@ GKE is useful when you want the job to run independently from a local machine.
 
 - 兌換不定期禮包碼：`code.php`
 - 用積分購買橙裝：`sendshop.php`
+
+### 快速指令
+
+```bash
+# 預覽每日固定名單，不真的呼叫 API
+python3 run_daily_tasks.py --dry-run
+
+# 執行所有設定帳號
+python3 run_daily_tasks.py --insecure
+
+# 替所有帳號兌換一組禮物碼
+python3 redeem_gift_code.py CELEBRATE300K --insecure
+
+# 手動用積分購買橙裝
+python3 buy_orange_gear.py 1300112265000136 --insecure
+```
 
 ### GitHub Pages
 
