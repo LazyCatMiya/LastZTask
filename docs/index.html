@@ -80,6 +80,7 @@
         giftCode: "禮物碼",
         runTasks: "完成官網任務",
         redeemGift: "領取禮物碼",
+        buyOrangeGear: "用積分購買橙裝",
         results: "結果",
         noResults: "尚無結果",
         ready: "就緒",
@@ -88,6 +89,8 @@
         runningTasks: "執行任務中",
         redeeming: "領取中",
         redeemed: "已領取",
+        buyingOrangeGear: "購買橙裝中",
+        boughtOrangeGear: "已購買橙裝",
         failed: "失敗",
         waiting: "等待中",
         done: "{ok}/{total} 完成",
@@ -101,6 +104,7 @@
         taskFirst2000: "首次購買金磚數量達到 2000",
         taskVipWeek: "領取每週特權禮包",
         taskRedeemGift: "領取禮物碼",
+        taskBuyOrangeGear: "用積分購買橙裝",
         catNudge: "今天也要優雅完成任務",
       },
       en: {
@@ -110,6 +114,7 @@
         giftCode: "Gift Code",
         runTasks: "Complete Website Tasks",
         redeemGift: "Redeem Gift Code",
+        buyOrangeGear: "Buy Orange Gear with Points",
         results: "Results",
         noResults: "No results yet",
         ready: "Ready",
@@ -118,6 +123,8 @@
         runningTasks: "Running tasks",
         redeeming: "Redeeming",
         redeemed: "Redeemed",
+        buyingOrangeGear: "Buying orange gear",
+        boughtOrangeGear: "Orange gear purchased",
         failed: "Failed",
         waiting: "Waiting",
         done: "{ok}/{total} done",
@@ -131,6 +138,7 @@
         taskFirst2000: "First 2000 gold brick purchase",
         taskVipWeek: "Claim weekly VIP package",
         taskRedeemGift: "Redeem gift code",
+        taskBuyOrangeGear: "Buy orange gear with points",
         catNudge: "A tidy little task run, with paws",
       },
     };
@@ -185,6 +193,22 @@
         body: uid => ({ uid, vlevel: 1, type: "week", lang: "hk" }),
       },
     ];
+
+    const manualActions = {
+      buyOrangeGear: {
+        nameKey: "taskBuyOrangeGear",
+        method: "POST",
+        url: `${STORE_ORIGIN}/sendshop.php`,
+        body: uid => ({
+          lid: 202606,
+          uid,
+          type: "253014_1_20",
+          lang: "hk",
+          count: 1,
+          fromOrigin: "website",
+        }),
+      },
+    };
 
     function getInitialLanguage() {
       const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -396,6 +420,44 @@
         setBusy(false);
       }
 
+      async function buyOrangeGear() {
+        const cleanUid = requireUid();
+        if (!cleanUid) return;
+
+        setBusy(true);
+        setResults([]);
+        setStatus({ state: "running", key: "buyingOrangeGear", params: {} });
+
+        const task = manualActions.buyOrangeGear;
+        const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${task.nameKey}`;
+        setResults([{
+          id,
+          nameKey: task.nameKey,
+          method: task.method,
+          state: "running",
+          detail: t("waiting"),
+        }]);
+
+        try {
+          const response = await postJson(cleanUid, task.url, task.body(cleanUid));
+          const ok = isSuccessBody(response.body);
+          if (ok) celebrate();
+          setResults(previous => previous.map(result => (
+            result.id === id
+              ? { ...result, state: ok ? "ok" : "bad", detail: formatResponse(response) }
+              : result
+          )));
+          setStatus({ state: ok ? "ok" : "bad", key: ok ? "boughtOrangeGear" : "failed", params: {} });
+        } catch (error) {
+          setResults(previous => previous.map(result => (
+            result.id === id ? { ...result, state: "bad", detail: error.message } : result
+          )));
+          setStatus({ state: "bad", key: "failed", params: {} });
+        }
+
+        setBusy(false);
+      }
+
       return h("main", { className: "mx-auto w-[min(1120px,calc(100vw-32px))] py-7 text-ink md:py-9" },
         h("header", { className: "flex min-h-[52px] flex-col gap-4 border-b border-line pb-4 md:flex-row md:items-center md:justify-between" },
           h("div", { className: "flex min-w-0 items-center gap-3" },
@@ -465,6 +527,12 @@
                   onClick: redeemGiftCode,
                   className: secondaryButtonClassName,
                 }, h(Icon, { icon: "solar:gift-bold" }), h("span", null, t("redeemGift"))),
+                h("button", {
+                  type: "button",
+                  disabled: busy,
+                  onClick: buyOrangeGear,
+                  className: secondaryButtonClassName,
+                }, h(Icon, { icon: "solar:bag-4-bold" }), h("span", null, t("buyOrangeGear"))),
                 h("p", { className: "flex items-center justify-center gap-1.5 text-center text-xs font-bold text-muted" },
                   h(Icon, { icon: "fa6-solid:cat", className: "h-4 w-4 text-brand" }),
                   t("catNudge"),

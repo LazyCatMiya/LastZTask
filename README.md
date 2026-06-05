@@ -19,11 +19,17 @@ This project runs captured LastZ store task APIs for one or more player IDs:
 
 Use this only with accounts you are allowed to operate.
 
+Manual-only actions are kept outside the daily CronJob:
+
+- Redeem occasional gift codes: `code.php`
+- Buy orange gear with points: `sendshop.php`
+
 ### GitHub Pages
 
 The static web page is in `docs/index.html`. In GitHub Pages, publish from the `docs` folder on your default branch.
 
 The page uses React CDN, Tailwind CSS CDN, Framer Motion CDN, Iconify CDN, Google Fonts, and canvas-confetti CDN. It stores the entered user ID in browser `localStorage`, runs website tasks for that ID, and can redeem one gift code for the same ID.
+It can also manually buy orange gear with points for the entered user ID.
 
 ### Batch Accounts
 
@@ -128,6 +134,26 @@ Run quietly:
 python3 redeem_gift_code.py CELEBRATE300K --insecure --quiet
 ```
 
+### Manual Shop Actions
+
+Buy orange gear with points for one account:
+
+```bash
+python3 buy_orange_gear.py 1300112265000136 --insecure
+```
+
+Preview the request without calling the API:
+
+```bash
+python3 buy_orange_gear.py 1300112265000136 --dry-run
+```
+
+Run it for every enabled account in `accounts.json`:
+
+```bash
+python3 buy_orange_gear.py --all-accounts --insecure
+```
+
 ### GKE CronJob
 
 The project includes `Dockerfile` and `k8s/cronjob.yaml`. The CronJob runs daily at 10:30 Taipei time:
@@ -214,11 +240,16 @@ GKE is useful when you want the job to run independently from a local machine.
 
 請只對你有權操作的帳號使用。
 
+以下功能是手動觸發，不會放進每日 CronJob：
+
+- 兌換不定期禮包碼：`code.php`
+- 用積分購買橙裝：`sendshop.php`
+
 ### GitHub Pages
 
 靜態網頁放在 `docs/index.html`。在 GitHub Pages 設定中，選擇從預設分支的 `docs` 資料夾發佈。
 
-頁面使用 React CDN、Tailwind CSS CDN、Framer Motion CDN、Iconify CDN、Google Fonts、canvas-confetti CDN。它會把輸入的 user id 存到瀏覽器 `localStorage`，可以用同一個 user id 完成官網任務，也可以領取一組禮物碼。
+頁面使用 React CDN、Tailwind CSS CDN、Framer Motion CDN、Iconify CDN、Google Fonts、canvas-confetti CDN。它會把輸入的 user id 存到瀏覽器 `localStorage`，可以用同一個 user id 完成官網任務，也可以領取一組禮物碼，或手動替輸入的 user id 用積分購買橙裝。
 
 ### 跑固定名單
 
@@ -321,6 +352,26 @@ python3 redeem_gift_code.py CELEBRATE300K --dry-run
 
 ```bash
 python3 redeem_gift_code.py CELEBRATE300K --insecure --quiet
+```
+
+### 手動商城操作
+
+手動替單一帳號用積分購買橙裝：
+
+```bash
+python3 buy_orange_gear.py 1300112265000136 --insecure
+```
+
+先預覽將送出的資料，不真的呼叫 API：
+
+```bash
+python3 buy_orange_gear.py 1300112265000136 --dry-run
+```
+
+或替 `accounts.json` 中所有啟用帳號執行：
+
+```bash
+python3 buy_orange_gear.py --all-accounts --insecure
 ```
 
 ### GKE 定時執行
