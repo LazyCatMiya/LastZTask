@@ -49,15 +49,13 @@ def build_tasks(uid: str, day: int, vip_level: int) -> list[ApiTask]:
         ApiTask(
             name="七日簽到",
             url=f"{STORE_ORIGIN}/sendday7_new.php",
-            origin=STORE_ORIGIN,
-            referer=f"{STORE_ORIGIN}/",
-            include_login_cookie=True,
+            origin=WEBSITE_ORIGIN,
+            referer=f"{WEBSITE_ORIGIN}/",
             payload={
                 "uid": uid,
-                "fromkoc": "",
                 "day": day,
                 "dtype": 0,
-                "lang": "zh-HK",
+                "lang": "hk",
             },
         ),
         ApiTask(
@@ -192,7 +190,7 @@ def parse_args() -> argparse.Namespace:
         description="Input a LastZ user id and call the captured store task APIs."
     )
     parser.add_argument("uid", nargs="?", help="玩家 user id / uid")
-    parser.add_argument("--day", type=int, default=1, help="七日簽到 day 值，預設 1")
+    parser.add_argument("--day", type=int, default=5, help="七日簽到 day 值，預設 5")
     parser.add_argument("--vip-level", type=int, default=1, help="VIP 等級 vlevel，預設 1")
     parser.add_argument("--delay", type=float, default=0.8, help="每個 API 間隔秒數，預設 0.8")
     parser.add_argument("--timeout", type=float, default=20, help="單次請求逾時秒數，預設 20")

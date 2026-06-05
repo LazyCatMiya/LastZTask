@@ -159,7 +159,7 @@ python3 lastz_tasks.py
 Optional arguments:
 
 ```bash
-python3 lastz_tasks.py 1556975198000136 --day 1 --vip-level 1 --delay 1.2
+python3 lastz_tasks.py 1556975198000136 --day 5 --vip-level 1 --delay 1.2
 ```
 
 ### Gift Codes
@@ -404,7 +404,7 @@ python3 lastz_tasks.py
 可選參數：
 
 ```bash
-python3 lastz_tasks.py 1556975198000136 --day 1 --vip-level 1 --delay 1.2
+python3 lastz_tasks.py 1556975198000136 --day 5 --vip-level 1 --delay 1.2
 ```
 
 ### 兌換不定期禮包碼
