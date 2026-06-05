@@ -364,7 +364,7 @@
             nameKey: "taskDay7",
             method: "POST",
             url: `${STORE_ORIGIN}/sendday7_new.php`,
-            body: uid => ({uid, day: 5, dtype: 0, lang: "hk"}),
+            body: (uid, day = 5) => ({uid, day, dtype: 0, lang: "hk"}),
         },
         {
             nameKey: "taskGetShop",
@@ -644,10 +644,29 @@
         }
 
         function resultDetail(result) {
-            if (result.state === "running") return t("waiting");
+            if (result.state === "running") return result.detail || t("waiting");
             if (result.error) return result.error;
             if (result.response) return formatResponse(result.response, result.nameKey, language);
             return result.detail || "";
+        }
+
+        async function runTaskForAccount(account, task, id) {
+            if (task.nameKey !== "taskDay7") {
+                const response = await postJson(account.uid, task.url, task.body(account.uid));
+                return {response, ok: isSuccessBody(response.body)};
+            }
+
+            let lastResponse = null;
+            for (let day = 0; day <= 6; day += 1) {
+                setResults(previous => previous.map(result => (
+                    result.id === id ? {...result, detail: `day ${day}`} : result
+                )));
+                const response = await postJson(account.uid, task.url, task.body(account.uid, day));
+                lastResponse = response;
+                if (isSuccessBody(response.body)) return {response, ok: true};
+                await wait(250);
+            }
+            return {response: lastResponse, ok: false};
         }
 
         function accountLabel(account) {
@@ -732,8 +751,7 @@
                     setResults(previous => [...previous, pendingResult]);
 
                     try {
-                        const response = await postJson(account.uid, task.url, task.body(account.uid));
-                        const ok = isSuccessBody(response.body);
+                        const {response, ok} = await runTaskForAccount(account, task, id);
                         if (ok) {
                             okCount += 1;
                             celebrate();

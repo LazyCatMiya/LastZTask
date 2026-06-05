@@ -44,20 +44,24 @@ class TaskResult:
     error: str = ""
 
 
+def build_day7_task(uid: str, day: int) -> ApiTask:
+    return ApiTask(
+        name="七日簽到",
+        url=f"{STORE_ORIGIN}/sendday7_new.php",
+        origin=WEBSITE_ORIGIN,
+        referer=f"{WEBSITE_ORIGIN}/",
+        payload={
+            "uid": uid,
+            "day": day,
+            "dtype": 0,
+            "lang": "hk",
+        },
+    )
+
+
 def build_tasks(uid: str, day: int, vip_level: int) -> list[ApiTask]:
     return [
-        ApiTask(
-            name="七日簽到",
-            url=f"{STORE_ORIGIN}/sendday7_new.php",
-            origin=WEBSITE_ORIGIN,
-            referer=f"{WEBSITE_ORIGIN}/",
-            payload={
-                "uid": uid,
-                "day": day,
-                "dtype": 0,
-                "lang": "hk",
-            },
-        ),
+        build_day7_task(uid, day),
         ApiTask(
             name="進入積分商城頁面",
             url=f"{STORE_ORIGIN}/getshop.php",
@@ -185,12 +189,28 @@ def post_json(
         return response.status, response.read().decode("utf-8", errors="replace")
 
 
+def is_api_success(status: int, text: str) -> bool:
+    if not 200 <= status < 300:
+        return False
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return True
+    if isinstance(data, dict) and "code" in data:
+        return data.get("code") == 0
+    if isinstance(data, dict) and "errorCode" in data:
+        return data.get("errorCode") == "ok"
+    return True
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Input a LastZ user id and call the captured store task APIs."
     )
     parser.add_argument("uid", nargs="?", help="玩家 user id / uid")
-    parser.add_argument("--day", type=int, default=5, help="七日簽到 day 值，預設 5")
+    parser.add_argument("--day", type=int, default=5, help="固定七日簽到 day 值，搭配 --fixed-day 使用；預設 5")
+    parser.add_argument("--auto-day", dest="auto_day", action="store_true", default=True, help="七日簽到從 day 0 試到 6，第一個成功就停止；預設啟用")
+    parser.add_argument("--fixed-day", dest="auto_day", action="store_false", help="停用 auto day，改用 --day 指定的固定 day")
     parser.add_argument("--vip-level", type=int, default=1, help="VIP 等級 vlevel，預設 1")
     parser.add_argument("--delay", type=float, default=0.8, help="每個 API 間隔秒數，預設 0.8")
     parser.add_argument("--timeout", type=float, default=20, help="單次請求逾時秒數，預設 20")
@@ -223,11 +243,28 @@ def run_tasks_for_uid(
     ssl_context: ssl.SSLContext | None,
     dry_run: bool,
     quiet: bool = False,
+    auto_day: bool = False,
 ) -> list[TaskResult]:
     tasks = build_tasks(uid=uid, day=day, vip_level=vip_level)
     results: list[TaskResult] = []
 
     for index, task in enumerate(tasks, start=1):
+        if auto_day and task.name == "七日簽到":
+            result = run_auto_day_task(
+                uid,
+                index=index,
+                total=len(tasks),
+                user_agent=user_agent,
+                timeout=timeout,
+                ssl_context=ssl_context,
+                dry_run=dry_run,
+                quiet=quiet,
+            )
+            results.append(result)
+            if index < len(tasks) and delay > 0:
+                time.sleep(delay)
+            continue
+
         if not quiet:
             print(f"\n[{index}/{len(tasks)}] {task.name}")
             print(f"POST {task.url}")
@@ -269,6 +306,59 @@ def run_tasks_for_uid(
     return results
 
 
+def run_auto_day_task(
+    uid: str,
+    *,
+    index: int,
+    total: int,
+    user_agent: str,
+    timeout: float,
+    ssl_context: ssl.SSLContext | None,
+    dry_run: bool,
+    quiet: bool,
+) -> TaskResult:
+    task_name = "七日簽到"
+    last_status: int | None = None
+    last_text = ""
+    last_error = ""
+
+    for day in range(7):
+        task = build_day7_task(uid, day)
+        if not quiet:
+            print(f"\n[{index}/{total}] {task.name} auto day {day}")
+            print(f"POST {task.url}")
+            print(json.dumps(task.payload, ensure_ascii=False, indent=2))
+
+        if dry_run:
+            continue
+
+        try:
+            status, text = post_json(uid, task, user_agent, timeout, ssl_context)
+        except urllib.error.HTTPError as exc:
+            text = exc.read().decode("utf-8", errors="replace")
+            last_status = exc.code
+            last_text = text
+            last_error = f"HTTP {exc.code}"
+            if not quiet:
+                print(f"HTTP {exc.code}: {text}", file=sys.stderr)
+        except (urllib.error.URLError, TimeoutError) as exc:
+            last_error = str(exc)
+            if not quiet:
+                print(f"請求失敗：{exc}", file=sys.stderr)
+        else:
+            last_status = status
+            last_text = text
+            if not quiet:
+                print(f"HTTP {status}: {text}")
+            if is_api_success(status, text):
+                return TaskResult(task_name=f"{task_name} day {day}", ok=True, status=status, response_text=text)
+
+    if dry_run:
+        return TaskResult(task_name=f"{task_name} auto day 0-6", ok=True)
+
+    return TaskResult(task_name=f"{task_name} auto day 0-6", ok=False, status=last_status, response_text=last_text, error=last_error)
+
+
 def main() -> int:
     args = parse_args()
     uid = require_uid(args.uid)
@@ -290,6 +380,7 @@ def main() -> int:
         ssl_context=ssl_context,
         dry_run=args.dry_run,
         quiet=args.quiet,
+        auto_day=args.auto_day,
     )
 
     return 0 if all(result.ok for result in results) else 1
