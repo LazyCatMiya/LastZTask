@@ -97,6 +97,7 @@
         taskLogin: "完成任務：登入",
         taskViewUcenter: "完成任務：瀏覽會員中心頁面",
         taskViewShop: "完成任務：瀏覽積分商城頁面",
+        taskBuy1000: "每日購買任意禮包或購買金碼數量達到 1000",
         taskFirst2000: "首次購買金磚數量達到 2000",
         taskVipWeek: "領取每週特權禮包",
         taskRedeemGift: "領取禮物碼",
@@ -126,6 +127,7 @@
         taskLogin: "Complete task: login",
         taskViewUcenter: "Complete task: view member center",
         taskViewShop: "Complete task: view points shop",
+        taskBuy1000: "Daily package purchase or 1000 gold code purchase",
         taskFirst2000: "First 2000 gold brick purchase",
         taskVipWeek: "Claim weekly VIP package",
         taskRedeemGift: "Redeem gift code",
@@ -163,6 +165,12 @@
         method: "POST",
         url: `${STORE_ORIGIN}/sendtask_new.php`,
         body: uid => ({ uid, type: "viewshop", lang: "hk", fromOrigin: "website" }),
+      },
+      {
+        nameKey: "taskBuy1000",
+        method: "POST",
+        url: `${STORE_ORIGIN}/sendtask_new.php`,
+        body: uid => ({ uid, type: "buy1000", lang: "hk", fromOrigin: "website" }),
       },
       {
         nameKey: "taskFirst2000",

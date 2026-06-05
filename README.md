@@ -13,6 +13,7 @@ This project runs captured LastZ store task APIs for one or more player IDs:
 - Complete the login task: `sendtask_new.php`
 - Complete the member center view task: `sendtask_new.php`
 - Complete the points shop view task: `sendtask_new.php`
+- Complete the daily package or 1000 gold code purchase task: `sendtask_new.php`
 - Complete the first 2000 gold brick purchase task: `sendtask_new.php`
 - Claim the weekly VIP package: `sendvip.php`
 
@@ -207,6 +208,7 @@ GKE is useful when you want the job to run independently from a local machine.
 - 完成「登入」任務：`sendtask_new.php`
 - 完成「瀏覽會員中心頁面」任務：`sendtask_new.php`
 - 完成「瀏覽積分商城頁面」任務：`sendtask_new.php`
+- 完成「每日購買任意禮包或購買金碼數量達到 1000」任務：`sendtask_new.php`
 - 完成「首次購買金磚數量達到 2000」任務：`sendtask_new.php`
 - 領取「每週特權禮包」：`sendvip.php`
 

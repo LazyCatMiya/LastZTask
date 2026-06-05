@@ -107,6 +107,18 @@ def build_tasks(uid: str, day: int, vip_level: int) -> list[ApiTask]:
             },
         ),
         ApiTask(
+            name="每日購買任意禮包或購買金碼數量達到 1000",
+            url=f"{STORE_ORIGIN}/sendtask_new.php",
+            origin=WEBSITE_ORIGIN,
+            referer=f"{WEBSITE_ORIGIN}/",
+            payload={
+                "uid": uid,
+                "type": "buy1000",
+                "lang": "hk",
+                "fromOrigin": "website",
+            },
+        ),
+        ApiTask(
             name="首次購買金磚數量達到 2000",
             url=f"{STORE_ORIGIN}/sendtask_new.php",
             origin=STORE_ORIGIN,
