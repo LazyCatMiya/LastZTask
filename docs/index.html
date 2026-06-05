@@ -589,6 +589,7 @@
         if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002001 && message === "send day fail") return appendDay(translatedLine(language, {zh: "不是現在該簽的日子，", en: "This is not the day to check in."}), result, language);
         if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002040 && message === "task forever insert fail") return appendDay(translatedLine(language, {zh: "今天已經簽過這天了，", en: "You already checked in for this day."}), result, language);
         if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002001 && message === "day fail") return appendDay(translatedLine(language, {zh: "這是明天，所以基本上不該出現！", en: "This is tomorrow, so this basically should not appear!"}), result, language);
+        if (taskKey === "taskDay7Makeup" && code === 10002001 && message === "get score fail") return appendDay(translatedLine(language, {zh: "積分不足無法補簽！", en: "Not enough points for makeup check-in!"}), result, language);
         if (taskKey === "taskBuy1000" && code === 10002038 && message === "get task type buy1000 fail") return translatedLine(language, {zh: "你今天還沒買夠！", en: "You have not bought enough today!"});
         if (taskKey === "taskFirst2000" && code === 10002038 && message === "get task type first2000 fail") return translatedLine(language, {zh: "魔法小卡拿出來！", en: "Time to bring out the magic card!"});
         if (taskKey === "taskVipWeek" && code === 10002001 && message === "vip level fail") return translatedLine(language, {zh: "VIP 等級錯誤！", en: "VIP level is incorrect!"});
