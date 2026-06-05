@@ -504,17 +504,20 @@
                 taskBuy1000: "買夠了，任務完成！",
                 taskFirst2000: "首次 2000 任務完成！",
                 taskVipWeek: "每週禮包領到惹！",
-                taskBuyOrangeGear: "橙裝買到惹！",
+                taskBuyOrangeGear: "購買完成！",
             };
             if (successMessages[taskKey]) return successMessages[taskKey];
         }
-        if (taskKey === "taskRedeemGift" && result.body.errorCode === "ok") return "禮物碼領到惹！";
+        if (taskKey === "taskRedeemGift" && result.body.errorCode === "ok") return "領取完成！";
+        if (taskKey === "taskRedeemGift" && result.body.errorCode === "E006" && message === "code already exchanged") return "領過了啦！";
         if (taskKey === "taskLookupUser" && code === 10018 && message === "get user fail") return "你沒有名字...";
-        if (code === 10018 && message === "task forever sql fail") return "今天已經領過惹";
+        if (code === 10018 && message === "task forever sql fail") return "今天已經領過惹！";
         if (taskKey === "taskDay7" && code === 10002001 && message === "send day fail") return "今天已經簽到惹";
-        if (taskKey === "taskBuy1000" && code === 10002038 && message === "get task type buy1000 fail") return "你今天還沒買夠";
+        if (taskKey === "taskDay7" && code === 10002040 && message === "task forever insert fail") return "簽過了啦！";
+        if (taskKey === "taskBuy1000" && code === 10002038 && message === "get task type buy1000 fail") return "你今天還沒買夠！";
         if (taskKey === "taskFirst2000" && code === 10002038 && message === "get task type first2000 fail") return "魔法小卡拿出來！";
-        if (taskKey === "taskVipWeek" && code === 10002001 && message === "vip level fail") return "VIP 等級錯誤";
+        if (taskKey === "taskVipWeek" && code === 10002001 && message === "vip level fail") return "VIP 等級錯誤！";
+        if (taskKey === "taskBuyOrangeGear" && code === 10002036 && message === "score fail") return "積分不夠！";
         return "";
     }
 
