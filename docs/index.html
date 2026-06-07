@@ -549,6 +549,16 @@
         return language === "zh" ? `${message}${label}` : `${message} ${label}.`;
     }
 
+    function day7StatusSummary(result, language) {
+        const rewards = Array.isArray(result.body && result.body.reward) ? result.body.reward : [];
+        const signedCount = rewards.filter(reward => reward && Number(reward.status) === 0).length;
+        const makeupCount = rewards.filter(reward => reward && Number(reward.status) === -1).length;
+        return translatedLine(language, {
+            zh: `狀態取得完成！已簽${signedCount}天，${makeupCount}天未簽`,
+            en: `Status loaded! ${signedCount} signed, ${makeupCount} available for makeup.`,
+        });
+    }
+
     function friendlyResponseMessage(result, taskKey, language) {
         if (!result.body || typeof result.body !== "object") return "";
 
@@ -573,7 +583,7 @@
         if (taskKey === "taskRedeemGift" && result.body.errorCode === "ok") return translatedLine(language, {zh: "領取完成！", en: "Claim complete!"});
         if (taskKey === "taskRedeemGift" && result.body.errorCode === "E006" && message === "code already exchanged") return translatedLine(language, {zh: "領過了啦！", en: "Already claimed!"});
         if (taskKey === "taskLookupUser" && code === 10018 && message === "get user fail") return translatedLine(language, {zh: "你沒有名字...", en: "You have no name..."});
-        if (taskKey === "taskDay7Status" && Array.isArray(result.body.reward)) return translatedLine(language, {zh: "狀態取得完成！", en: "Status loaded!"});
+        if (taskKey === "taskDay7Status" && Array.isArray(result.body.reward)) return day7StatusSummary(result, language);
         if (taskKey === "taskVipStatus" && (Array.isArray(result.body.rewardWeekConfig) || Array.isArray(result.body.rewardForeverConfig))) {
             const vipLevel = result.body.vlevel;
             if (vipLevel !== undefined && vipLevel !== null) {
@@ -584,7 +594,7 @@
             }
             return translatedLine(language, {zh: "VIP 等級取得完成！", en: "VIP level data loaded!"});
         }
-        if (taskKey === "taskVipWeek" && code === 10018 && message === "week sql fail") return translatedLine(language, {zh: "已領取特權禮包！", en: "VIP package already claimed!"});
+        if (taskKey === "taskVipWeek" && code === 10018 && message === "week sql fail") return translatedLine(language, {zh: "你已經領過惹！", en: "You already claimed it!"});
         if (taskKey === "taskFirst2000" && code === 10018 && message === "task forever sql fail") return translatedLine(language, {zh: "你已經領過惹！", en: "You already claimed it!"});
         if (code === 10018 && message === "task forever sql fail") return translatedLine(language, {zh: "今天已經領過惹！", en: "Already claimed today!"});
         if ((taskKey === "taskDay7" || taskKey === "taskDay7Makeup") && code === 10002001 && message === "send day fail") return appendDay(translatedLine(language, {zh: "不是現在該簽的日子，", en: "This is not the day to check in."}), result, language);
