@@ -88,6 +88,7 @@
     const USER_STORAGE_KEY = "lastz:user-id";
     const LANGUAGE_STORAGE_KEY = "lastz:language";
     const HUMAN_RESPONSE_STORAGE_KEY = "lastz:human-response";
+    const GO_AWAY_USER_ID = "1016720328000136";
 
     const translations = {
         zh: {
@@ -101,6 +102,9 @@
             buyOrangeGear: "用積分購買橙裝",
             results: "結果",
             humanResponse: "說人話",
+            goAway: "滾！",
+            taskGoAway: "😠😡🤬",
+            reluctantHelp: "我才沒有想幫忙你！",
         noResults: "看什麼看？快點按按鈕！",
         ready: "喵喵喵",
             missingInput: "請輸入禮物碼",
@@ -141,6 +145,9 @@
             buyOrangeGear: "Buy Orange Gear with Points",
             results: "Results",
             humanResponse: "Human-readable",
+            goAway: "Go away!",
+            taskGoAway: "Private easter egg",
+            reluctantHelp: "I'm not helping you because I want to!",
         noResults: "What are you looking at? Press a button!",
         ready: "Meow meow meow",
             missingInput: "Please enter a gift code",
@@ -465,6 +472,20 @@
         return Array.from(new Set(value.split(/[\s,，]+/).map(item => item.trim()).filter(Boolean)));
     }
 
+    function isGoAwayUserId(userId) {
+        return String(userId).trim() === GO_AWAY_USER_ID;
+    }
+
+    function goAwayLine(language, index = 0) {
+        const lines = [
+            {zh: "系統偵測到奇怪的東西！", en: "System detected something strange!"},
+            {zh: "這裡沒有你的禮物！！", en: "No gift for this ID. Just: go away!"},
+            {zh: "任務已取消，原因：滾！！！！", en: "Task canceled. Reason: you should go away."},
+            {zh: "門在那邊，慢走不送！", en: "The door is that way. Go away!"},
+        ];
+        return translatedLine(language, lines[index % lines.length]);
+    }
+
     function buildDay7Payload(uid, day = 5, dtype = 0) {
         if (dtype === 0 && day === 1) {
             return {uid, fromkoc: "", day, dtype: 0, lang: "zh-HK"};
@@ -551,7 +572,7 @@
 
     function day7StatusSummary(result, language) {
         const rewards = Array.isArray(result.body && result.body.reward) ? result.body.reward : [];
-        const signedCount = rewards.filter(reward => reward && Number(reward.status) === 0).length;
+        const signedCount = rewards.filter(reward => reward && Number(reward.status) === 2).length;
         const makeupCount = rewards.filter(reward => reward && Number(reward.status) === -1).length;
         return translatedLine(language, {
             zh: `狀態取得完成！已簽${signedCount}天，${makeupCount}天未簽`,
@@ -665,6 +686,7 @@
         const resultsListRef = useRef(null);
         const resultsEndRef = useRef(null);
         const previousResultCountRef = useRef(0);
+        const hasGoAwayUserId = useMemo(() => parseUserIds(uid).some(isGoAwayUserId), [uid]);
 
         const t = useMemo(() => {
             return (key, params = {}) => {
@@ -744,6 +766,27 @@
             return result.detail || "";
         }
 
+        function addGoAwayResult(account, detailIndex = 0) {
+            const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-go-away-${detailIndex}`;
+            setResults(previous => [...previous, {
+                id,
+                uid: account.uid,
+                accountLabel: accountLabel(account),
+                nameKey: "taskGoAway",
+                method: "NOPE",
+                state: "bad",
+                detail: goAwayLine(language, detailIndex),
+                goAwayEgg: true,
+            }]);
+        }
+
+        function removeGoAwayApiResults(account) {
+            if (!account.goAway) return;
+            setResults(previous => previous.filter(result => (
+                result.uid !== account.uid || result.goAwayEgg
+            )));
+        }
+
         async function runTaskForAccount(account, task, id) {
             const response = await postJson(account.uid, task.url, task.body(account.uid));
             return {response, ok: isSuccessBody(response.body)};
@@ -755,11 +798,13 @@
             const statusId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-vip-status`;
             setResults(previous => [...previous, {
                 id: statusId,
+                uid: account.uid,
                 accountLabel: accountLabel(account),
                 nameKey: "taskVipStatus",
                 method: "POST",
                 state: "running",
                 detail: t("waiting"),
+                reluctant: account.goAway,
             }]);
 
             let vipLevel = 1;
@@ -787,11 +832,14 @@
             const resultId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-vip-week`;
             setResults(previous => [...previous, {
                 id: resultId,
+                uid: account.uid,
                 accountLabel: accountLabel(account),
                 nameKey: "taskVipWeek",
                 method: "POST",
                 state: "running",
                 detail: `vlevel ${vipLevel}`,
+                reluctant: account.goAway,
+                reluctantNote: account.goAway,
             }]);
 
             try {
@@ -826,11 +874,13 @@
             const statusId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-day7-status`;
             setResults(previous => [...previous, {
                 id: statusId,
+                uid: account.uid,
                 accountLabel: accountLabel(account),
                 nameKey: "taskDay7Status",
                 method: "POST",
                 state: "running",
                 detail: t("waiting"),
+                reluctant: account.goAway,
             }]);
 
             let choices = [];
@@ -860,11 +910,13 @@
                 okCount += 1;
                 setResults(previous => [...previous, {
                     id: doneId,
+                    uid: account.uid,
                     accountLabel: accountLabel(account),
                     nameKey: "taskDay7Done",
                     method: "POST",
                     state: "ok",
                     response: {status: 200, body: {code: 0, message: "no status 1 or -1"}},
+                    reluctant: account.goAway,
                 }]);
             }
 
@@ -874,11 +926,13 @@
                 const nameKey = choice.dtype === 1 ? "taskDay7Makeup" : "taskDay7";
                 setResults(previous => [...previous, {
                     id: resultId,
+                    uid: account.uid,
                     accountLabel: accountLabel(account),
                     nameKey,
                     method: "POST",
                     state: "running",
                     detail: `day ${choice.day}`,
+                    reluctant: account.goAway,
                 }]);
 
                 try {
@@ -918,14 +972,17 @@
 
         async function lookupAccount(userId) {
             const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${userId}-lookup`;
-            const fallbackAccount = {uid: userId, name: "", abbr: "", lookupOk: false};
+            const goAway = isGoAwayUserId(userId);
+            const fallbackAccount = {uid: userId, name: "", abbr: "", lookupOk: false, goAway};
             setResults(previous => [...previous, {
                 id,
+                uid: userId,
                 accountLabel: userId,
                 nameKey: "taskLookupUser",
                 method: "POST",
                 state: "running",
                 detail: t("waiting"),
+                reluctant: goAway,
             }]);
 
             try {
@@ -934,7 +991,7 @@
                 const name = info.name ? info.name : "";
                 const abbr = info.abbr ? info.abbr : "";
                 const ok = response.body && response.body.code === 0;
-                const account = {uid: userId, name, abbr, lookupOk: ok};
+                const account = {uid: userId, name, abbr, lookupOk: ok, goAway};
                 setResults(previous => previous.map(result => (
                     result.id === id
                         ? {
@@ -943,6 +1000,7 @@
                             state: ok ? "ok" : "bad",
                             detail: ok ? accountFullLabel(account) : "",
                             response: ok ? null : response,
+                            reluctant: goAway,
                         }
                         : result
                 )));
@@ -974,6 +1032,14 @@
                 const account = await lookupAccount(userId);
                 totalCount += 1;
                 if (account.lookupOk) okCount += 1;
+                if (account.goAway) {
+                    addGoAwayResult(account, 1);
+                    await wait(260);
+                    addGoAwayResult(account, 2);
+                    await wait(260);
+                    addGoAwayResult(account, 3);
+                    await wait(260);
+                }
 
                 for (const task of taskDefinitions) {
                     if (task.nameKey === "taskDay7") {
@@ -996,11 +1062,13 @@
                     const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-${task.nameKey}`;
                     const pendingResult = {
                         id,
+                        uid: account.uid,
                         accountLabel: accountLabel(account),
                         nameKey: task.nameKey,
                         method: task.method,
                         state: "running",
                         detail: t("waiting"),
+                        reluctant: account.goAway,
                     };
                     setResults(previous => [...previous, pendingResult]);
 
@@ -1025,6 +1093,8 @@
 
                     await wait(450);
                 }
+
+                removeGoAwayApiResults(account);
             }
 
             setStatus({
@@ -1065,11 +1135,13 @@
                 const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-gift`;
                 setResults(previous => [...previous, {
                     id,
+                    uid: account.uid,
                     accountLabel: accountLabel(account),
                     nameKey: "taskRedeemGift",
                     method: "GET",
                     state: "running",
                     detail: t("waiting"),
+                    reluctant: account.goAway,
                 }]);
 
                 try {
@@ -1118,11 +1190,13 @@
                 const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-${task.nameKey}`;
                 setResults(previous => [...previous, {
                     id,
+                    uid: account.uid,
                     accountLabel: accountLabel(account),
                     nameKey: task.nameKey,
                     method: task.method,
                     state: "running",
                     detail: t("waiting"),
+                    reluctant: account.goAway,
                 }]);
 
                 try {
@@ -1206,7 +1280,9 @@
                                 onChange: event => updateUid(event.target.value),
                                 className: `${inputClassName} min-h-[72px] resize-y py-2 leading-relaxed`,
                             }),
-                            h("p", {className: "text-xs font-bold leading-relaxed text-muted"}, t("userIdHelp")),
+                            h("p", {className: `text-xs font-bold leading-relaxed ${hasGoAwayUserId ? "text-danger" : "text-muted"}`},
+                                hasGoAwayUserId ? goAwayLine(language, 0) : t("userIdHelp"),
+                            ),
                         ),
                         h(Field, {label: t("giftCode"), htmlFor: "giftCodeInput"},
                             h("input", {
@@ -1270,6 +1346,7 @@
                                     result,
                                     name: t(result.nameKey),
                                     detail: resultDetail(result),
+                                    reluctantLabel: t("reluctantHelp"),
                                 })),
                             h("div", {ref: resultsEndRef, "aria-hidden": true}),
                         ),
@@ -1326,15 +1403,20 @@
         );
     }
 
-    function ResultItem({result, name, detail}) {
-        return h("article", {className: "grid animate-resultIn grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg border border-line bg-white p-3"},
-            h("div", {className: `grid h-[26px] w-[26px] place-items-center rounded-full text-white ${badgeClass(result.state)}`}, stateIcon(result.state)),
+    function ResultItem({result, name, detail, reluctantLabel}) {
+        const reluctantClass = result.reluctant ? "border-line/45 bg-white/35 text-ink/55 saturate-50 grayscale" : "border-line bg-white";
+        const badgeTone = result.reluctant ? "opacity-50" : "";
+        return h("article", {className: `grid animate-resultIn grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg border p-3 transition ${reluctantClass}`},
+            h("div", {className: `grid h-[26px] w-[26px] place-items-center rounded-full text-white ${badgeClass(result.state)} ${badgeTone}`}, stateIcon(result.state)),
             h("div", null,
                 result.accountLabel
-                    ? h("p", {className: "mb-1 break-words text-[11px] font-extrabold leading-tight text-brand"}, result.accountLabel)
+                    ? h("p", {className: `mb-1 break-words text-[11px] font-extrabold leading-tight ${result.reluctant ? "text-muted" : "text-brand"}`}, result.accountLabel)
                     : null,
                 h("p", {className: "m-0 text-sm font-extrabold leading-tight"}, name),
                 h("p", {className: "mt-1 break-words font-mono text-xs leading-relaxed text-muted"}, detail),
+                result.reluctantNote
+                    ? h("p", {className: "mt-1 text-xs font-extrabold leading-tight text-danger/70"}, reluctantLabel)
+                    : null,
             ),
             h("span", {className: "text-xs font-extrabold text-muted"}, result.method),
         );
