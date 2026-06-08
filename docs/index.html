@@ -456,6 +456,18 @@
         return true;
     }
 
+    function getInitialGiftCode() {
+        const params = new URLSearchParams(window.location.search);
+        return (params.get("gift_code") || "").trim();
+    }
+
+    function clearGiftCodeParameter() {
+        const url = new URL(window.location.href);
+        if (!url.searchParams.has("gift_code")) return;
+        url.searchParams.delete("gift_code");
+        window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+    }
+
     function wait(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -676,7 +688,7 @@
         const [language, setLanguageState] = useState(getInitialLanguage);
         const [humanResponse, setHumanResponse] = useState(getInitialHumanResponse);
         const [uid, setUid] = useState(() => localStorage.getItem(USER_STORAGE_KEY) || "");
-        const [giftCode, setGiftCode] = useState("");
+        const [giftCode, setGiftCode] = useState(getInitialGiftCode);
         const [results, setResults] = useState([]);
         const [busy, setBusy] = useState(false);
         const [status, setStatus] = useState({state: "idle", key: "ready", params: {}});
@@ -703,6 +715,10 @@
         useEffect(() => {
             localStorage.setItem(HUMAN_RESPONSE_STORAGE_KEY, humanResponse ? "true" : "false");
         }, [humanResponse]);
+
+        useEffect(() => {
+            clearGiftCodeParameter();
+        }, []);
 
         useEffect(() => {
             if (!busy || results.length <= previousResultCountRef.current) {
