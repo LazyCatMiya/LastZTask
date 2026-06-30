@@ -5,7 +5,7 @@
 <h1 align="center">LastZ Task Runner</h1>
 
 <p align="center">
-  A lightweight LastZ task helper with a cute GitHub Pages UI, batch scripts, gift-code redemption, and GKE CronJob deployment.
+  A lightweight LastZ task helper with a cute GitHub Pages UI, batch scripts, manual shop actions, and GKE CronJob deployment.
 </p>
 
 <p align="center">
@@ -31,8 +31,8 @@
 
 | Surface | What it does |
 | --- | --- |
-| GitHub Pages | Runs website tasks for one user ID, redeems one gift code, and supports manual shop actions. |
-| Python scripts | Runs one account, all configured accounts, gift-code redemption, or manual orange-gear purchase. |
+| GitHub Pages | Runs website tasks for one user ID and supports manual shop actions. |
+| Python scripts | Runs one account, all configured accounts, or manual orange-gear purchase. |
 | GKE CronJob | Runs the daily task batch at 09:30 and 10:30 Asia/Taipei time. |
 | Local storage | Stores the entered GitHub Pages user ID in the browser only. |
 
@@ -53,7 +53,6 @@ Use this only with accounts you are allowed to operate.
 
 Manual-only actions are kept outside the daily CronJob:
 
-- Redeem occasional gift codes: `code.php`
 - Buy orange gear with points: `sendshop.php`
 
 ### Quick Commands
@@ -65,9 +64,6 @@ python3 run_daily_tasks.py --dry-run
 # Run all configured accounts
 python3 run_daily_tasks.py --insecure
 
-# Redeem one gift code for all accounts
-python3 redeem_gift_code.py CELEBRATE300K --insecure
-
 # Manually buy orange gear with points
 python3 buy_orange_gear.py 1300112265000136 --insecure
 ```
@@ -76,8 +72,7 @@ python3 buy_orange_gear.py 1300112265000136 --insecure
 
 The static web page is in `docs/index.html`. In GitHub Pages, publish from the `docs` folder on your default branch.
 
-The page uses React CDN, Tailwind CSS CDN, Framer Motion CDN, Iconify CDN, Google Fonts, and canvas-confetti CDN. It stores the entered user ID in browser `localStorage`, runs website tasks for that ID, and can redeem one gift code for the same ID.
-It can also manually buy orange gear with points for the entered user ID.
+The page uses React CDN, Tailwind CSS CDN, Framer Motion CDN, Iconify CDN, Google Fonts, and canvas-confetti CDN. It stores the entered user ID in browser `localStorage`, runs website tasks for that ID, and can manually buy orange gear with points for the entered user ID.
 
 ### Batch Accounts
 
@@ -173,23 +168,7 @@ The weekly VIP package calls `getvip.php` first and uses the top-level `vlevel` 
 
 ### Gift Codes
 
-Gift codes change each time, so they are better run manually instead of being added to the daily CronJob. The script applies the code to every account in `accounts.json`:
-
-```bash
-python3 redeem_gift_code.py CELEBRATE300K --insecure
-```
-
-Preview generated GET URLs:
-
-```bash
-python3 redeem_gift_code.py CELEBRATE300K --dry-run
-```
-
-Run quietly:
-
-```bash
-python3 redeem_gift_code.py CELEBRATE300K --insecure --quiet
-```
+Gift-code redemption is temporarily disabled because `giftcenter` appears to require a short-lived UUID from the login flow. The `redeem_gift_code.py` entry point is kept only to report that disabled status and will not call the API.
 
 ### Manual Shop Actions
 
@@ -288,8 +267,8 @@ GKE is useful when you want the job to run independently from a local machine.
 
 | 介面 | 用途 |
 | --- | --- |
-| GitHub Pages | 輸入單一 User ID 後執行官網任務、領取禮物碼、手動執行商城操作。 |
-| Python 腳本 | 可執行單一帳號、固定帳號名單、禮物碼兌換、手動橙裝購買。 |
+| GitHub Pages | 輸入單一 User ID 後執行官網任務、手動執行商城操作。 |
+| Python 腳本 | 可執行單一帳號、固定帳號名單、手動橙裝購買。 |
 | GKE CronJob | 每天台北時間 09:30 和 10:30 自動跑固定名單。 |
 | Local storage | GitHub Pages 只會把輸入的 User ID 存在瀏覽器本機。 |
 
@@ -308,7 +287,6 @@ GKE is useful when you want the job to run independently from a local machine.
 
 以下功能是手動觸發，不會放進每日 CronJob：
 
-- 兌換不定期禮包碼：`code.php`
 - 用積分購買橙裝：`sendshop.php`
 
 ### 快速指令
@@ -320,9 +298,6 @@ python3 run_daily_tasks.py --dry-run
 # 執行所有設定帳號
 python3 run_daily_tasks.py --insecure
 
-# 替所有帳號兌換一組禮物碼
-python3 redeem_gift_code.py CELEBRATE300K --insecure
-
 # 手動用積分購買橙裝
 python3 buy_orange_gear.py 1300112265000136 --insecure
 ```
@@ -331,7 +306,7 @@ python3 buy_orange_gear.py 1300112265000136 --insecure
 
 靜態網頁放在 `docs/index.html`。在 GitHub Pages 設定中，選擇從預設分支的 `docs` 資料夾發佈。
 
-頁面使用 React CDN、Tailwind CSS CDN、Framer Motion CDN、Iconify CDN、Google Fonts、canvas-confetti CDN。它會把輸入的 user id 存到瀏覽器 `localStorage`，可以用同一個 user id 完成官網任務，也可以領取一組禮物碼，或手動替輸入的 user id 用積分購買橙裝。
+頁面使用 React CDN、Tailwind CSS CDN、Framer Motion CDN、Iconify CDN、Google Fonts、canvas-confetti CDN。它會把輸入的 user id 存到瀏覽器 `localStorage`，可以用同一個 user id 完成官網任務，或手動替輸入的 user id 用積分購買橙裝。
 
 ### 跑固定名單
 
@@ -427,23 +402,7 @@ python3 run_daily_tasks.py --day 5 --insecure
 
 ### 兌換不定期禮包碼
 
-禮包碼每次不同，不建議放進每日 CronJob。拿到 code 後手動跑一次即可，腳本會套用 `accounts.json` 的所有帳號：
-
-```bash
-python3 redeem_gift_code.py CELEBRATE300K --insecure
-```
-
-先預覽將送出的 GET URL：
-
-```bash
-python3 redeem_gift_code.py CELEBRATE300K --dry-run
-```
-
-不輸出執行 log：
-
-```bash
-python3 redeem_gift_code.py CELEBRATE300K --insecure --quiet
-```
+禮物碼領取功能已暫時停用，因為 `giftcenter` 看起來需要登入流程取得的短效 UUID。`redeem_gift_code.py` 目前只會回報停用狀態，不會呼叫 API。
 
 ### 手動商城操作
 

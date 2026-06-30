@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LastZ Task Runner</title>
-    <meta name="description" content="A cute LastZ task helper for running website tasks, redeeming gift codes, and triggering manual shop actions from a simple GitHub Pages interface.">
+    <meta name="description" content="A cute LastZ task helper for running website tasks and triggering manual shop actions from a simple GitHub Pages interface.">
     <meta name="application-name" content="LastZ Task Runner">
     <meta name="robots" content="index, follow">
     <meta name="theme-color" content="#277A6A">
@@ -12,10 +12,10 @@
     <meta property="og:locale" content="zh_TW">
     <meta property="og:site_name" content="LastZ Task Runner">
     <meta property="og:title" content="LastZ Task Runner">
-    <meta property="og:description" content="官網任務與禮物碼領取，一個簡單可愛的 LastZ 任務輔助頁面。">
+    <meta property="og:description" content="官網任務與手動商城操作，一個簡單可愛的 LastZ 任務輔助頁面。">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="LastZ Task Runner">
-    <meta name="twitter:description" content="官網任務與禮物碼領取，一個簡單可愛的 LastZ 任務輔助頁面。">
+    <meta name="twitter:description" content="官網任務與手動商城操作，一個簡單可愛的 LastZ 任務輔助頁面。">
     <link rel="icon" type="image/png" href="image.png?v=20260605">
     <link rel="apple-touch-icon" href="image.png?v=20260605">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -84,7 +84,6 @@
     const {createRoot} = ReactDOM;
     const h = React.createElement;
     const STORE_ORIGIN = "https://store.last-z.com";
-    const GIFT_ORIGIN = "https://giftcenter.last-z.com";
     const USER_STORAGE_KEY = "lastz:user-id";
     const LANGUAGE_STORAGE_KEY = "lastz:language";
     const HUMAN_RESPONSE_STORAGE_KEY = "lastz:human-response";
@@ -92,13 +91,11 @@
 
     const translations = {
         zh: {
-        subtitle: "官網任務與禮物碼領取",
+        subtitle: "官網任務與手動商城操作",
             controls: "操作",
             userId: "User ID",
-            giftCode: "禮物碼",
             userIdHelp: "可輸入多組 ID，用逗號、空格或換行分隔",
             runTasks: "完成官網任務",
-            redeemGift: "領取禮物碼",
             buyOrangeGear: "用積分購買橙裝",
             results: "結果",
             humanResponse: "說人話",
@@ -107,11 +104,8 @@
             reluctantHelp: "我才沒有想幫忙你！",
         noResults: "看什麼看？快點按按鈕！",
         ready: "喵喵喵",
-            missingInput: "請輸入禮物碼",
             missingUserId: "請輸入 User ID",
             runningTasks: "執行任務中",
-            redeeming: "領取中",
-            redeemed: "已領取",
             buyingOrangeGear: "購買橙裝中",
             boughtOrangeGear: "已購買橙裝",
             failed: "失敗",
@@ -127,7 +121,6 @@
             taskFirst2000: "任務：首次購買金磚 > 2000",
             taskVipWeek: "領取每週特權禮包",
             taskVipStatus: "取得 VIP 等級資料",
-            taskRedeemGift: "領取禮物碼",
             taskBuyOrangeGear: "用積分購買橙裝",
             taskLookupUser: "搜尋用戶名稱",
             taskDay7Status: "取得七日簽到狀態",
@@ -135,13 +128,11 @@
             taskDay7Done: "七日簽到",
         },
         en: {
-        subtitle: "Website tasks and gift code redemption",
+        subtitle: "Website tasks and manual shop actions",
             controls: "Controls",
             userId: "User ID",
-            giftCode: "Gift Code",
             userIdHelp: "Enter multiple IDs separated by commas, spaces, or new lines",
             runTasks: "Complete Website Tasks",
-            redeemGift: "Redeem Gift Code",
             buyOrangeGear: "Buy Orange Gear with Points",
             results: "Results",
             humanResponse: "Human-readable",
@@ -150,11 +141,8 @@
             reluctantHelp: "I'm not helping you because I want to!",
         noResults: "What are you looking at? Press a button!",
         ready: "Meow meow meow",
-            missingInput: "Please enter a gift code",
             missingUserId: "Please enter a User ID",
             runningTasks: "Running tasks",
-            redeeming: "Redeeming",
-            redeemed: "Redeemed",
             buyingOrangeGear: "Buying orange gear",
             boughtOrangeGear: "Orange gear purchased",
             failed: "Failed",
@@ -170,7 +158,6 @@
             taskFirst2000: "Task: first gold bricks purchase > 2000",
             taskVipWeek: "Claim weekly VIP package",
             taskVipStatus: "Get VIP level data",
-            taskRedeemGift: "Redeem gift code",
             taskBuyOrangeGear: "Buy orange gear with points",
             taskLookupUser: "Look up user name",
             taskDay7Status: "Get 7-day check-in status",
@@ -456,18 +443,6 @@
         return true;
     }
 
-    function getInitialGiftCode() {
-        const params = new URLSearchParams(window.location.search);
-        return (params.get("gift_code") || "").trim();
-    }
-
-    function clearGiftCodeParameter() {
-        const url = new URL(window.location.href);
-        if (!url.searchParams.has("gift_code")) return;
-        url.searchParams.delete("gift_code");
-        window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
-    }
-
     function wait(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -545,17 +520,6 @@
         return readResponse(response);
     }
 
-    async function getJson(uid, url) {
-        const response = await fetch(url, {
-            method: "GET",
-            headers: {
-                Accept: "application/json, text/plain, */*",
-                Usertoken: uid,
-            },
-        });
-        return readResponse(response);
-    }
-
     function isSuccessBody(body) {
         if (!body || typeof body !== "object") return false;
         if (body.code === 10018 && body.message === "task forever sql fail") return true;
@@ -613,8 +577,6 @@
             };
             if (successMessages[taskKey]) return translatedLine(language, successMessages[taskKey]);
         }
-        if (taskKey === "taskRedeemGift" && result.body.errorCode === "ok") return translatedLine(language, {zh: "領取完成！", en: "Claim complete!"});
-        if (taskKey === "taskRedeemGift" && result.body.errorCode === "E006" && message === "code already exchanged") return translatedLine(language, {zh: "領過了啦！", en: "Already claimed!"});
         if (taskKey === "taskLookupUser" && code === 10018 && message === "get user fail") return translatedLine(language, {zh: "你沒有名字...", en: "You have no name..."});
         if (taskKey === "taskDay7Status" && Array.isArray(result.body.reward)) return day7StatusSummary(result, language);
         if (taskKey === "taskVipStatus" && (Array.isArray(result.body.rewardWeekConfig) || Array.isArray(result.body.rewardForeverConfig))) {
@@ -688,7 +650,6 @@
         const [language, setLanguageState] = useState(getInitialLanguage);
         const [humanResponse, setHumanResponse] = useState(getInitialHumanResponse);
         const [uid, setUid] = useState(() => localStorage.getItem(USER_STORAGE_KEY) || "");
-        const [giftCode, setGiftCode] = useState(getInitialGiftCode);
         const [results, setResults] = useState([]);
         const [busy, setBusy] = useState(false);
         const [status, setStatus] = useState({state: "idle", key: "ready", params: {}});
@@ -715,10 +676,6 @@
         useEffect(() => {
             localStorage.setItem(HUMAN_RESPONSE_STORAGE_KEY, humanResponse ? "true" : "false");
         }, [humanResponse]);
-
-        useEffect(() => {
-            clearGiftCodeParameter();
-        }, []);
 
         useEffect(() => {
             if (!busy || results.length <= previousResultCountRef.current) {
@@ -1121,70 +1078,6 @@
             setBusy(false);
         }
 
-        async function redeemGiftCode() {
-            const userIds = requireUserIds();
-            const cleanCode = giftCode.trim();
-            if (userIds.length === 0) return;
-            if (!cleanCode) {
-                setStatus({state: "bad", key: "missingInput", params: {}});
-                showValidationMessage();
-                return;
-            }
-
-            setBusy(true);
-            setResults([]);
-            setValidationLineIndex(null);
-            previousResultCountRef.current = 0;
-            setStatus({state: "running", key: "redeeming", params: {}});
-            revealResults();
-
-            let okCount = 0;
-            const totalCount = userIds.length * 2;
-            for (const userId of userIds) {
-                const account = await lookupAccount(userId);
-                if (account.lookupOk) okCount += 1;
-
-                const url = new URL(`${GIFT_ORIGIN}/code.php`);
-                url.searchParams.set("uid", account.uid);
-                url.searchParams.set("code", cleanCode);
-
-                const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${account.uid}-gift`;
-                setResults(previous => [...previous, {
-                    id,
-                    uid: account.uid,
-                    accountLabel: accountLabel(account),
-                    nameKey: "taskRedeemGift",
-                    method: "GET",
-                    state: "running",
-                    detail: t("waiting"),
-                    reluctant: account.goAway,
-                }]);
-
-                try {
-                    const response = await getJson(account.uid, url.toString());
-                    const ok = response.body && response.body.errorCode === "ok";
-                    if (ok) {
-                        okCount += 1;
-                        celebrate();
-                    }
-                    setResults(previous => previous.map(result => (
-                        result.id === id
-                            ? {...result, state: ok ? "ok" : "bad", response}
-                            : result
-                    )));
-                } catch (error) {
-                    setResults(previous => previous.map(result => (
-                        result.id === id ? {...result, state: "bad", error: error.message} : result
-                    )));
-                }
-
-                await wait(450);
-            }
-
-            setStatus({state: okCount === totalCount ? "ok" : "bad", key: okCount === totalCount ? "redeemed" : "failed", params: {}});
-            setBusy(false);
-        }
-
         async function buyOrangeGear() {
             const userIds = requireUserIds();
             if (userIds.length === 0) return;
@@ -1300,17 +1193,6 @@
                                 hasGoAwayUserId ? goAwayLine(language, 0) : t("userIdHelp"),
                             ),
                         ),
-                        h(Field, {label: t("giftCode"), htmlFor: "giftCodeInput"},
-                            h("input", {
-                                id: "giftCodeInput",
-                                name: "giftCode",
-                                autoComplete: "off",
-                                placeholder: "CELEBRATE300K",
-                                value: giftCode,
-                                onChange: event => setGiftCode(event.target.value),
-                                className: inputClassName,
-                            }),
-                        ),
                         h("div", {className: "grid gap-2.5"},
                             h("button", {
                                 type: "button",
@@ -1318,12 +1200,6 @@
                                 onClick: runWebsiteTasks,
                                 className: primaryButtonClassName,
                             }, h(Icon, {icon: "mdi:paw"}), h("span", null, t("runTasks"))),
-                            h("button", {
-                                type: "button",
-                                disabled: busy,
-                                onClick: redeemGiftCode,
-                                className: secondaryButtonClassName,
-                            }, h(Icon, {icon: "solar:gift-bold"}), h("span", null, t("redeemGift"))),
                             h("button", {
                                 type: "button",
                                 disabled: busy,
